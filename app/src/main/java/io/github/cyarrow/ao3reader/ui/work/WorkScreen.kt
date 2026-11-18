@@ -71,6 +71,8 @@ import kotlinx.coroutines.withContext
 data class WorkUiState(
     val summary: WorkSummary? = null,
     val work: Work? = null,
+    /** Unconverted work: tag searches must use AO3's original tag text. */
+    val raw: Work? = null,
     val loading: Boolean = true,
     val error: Throwable? = null,
 )
@@ -87,7 +89,7 @@ class WorkViewModel(private val container: AppContainer, private val id: Long) :
             try {
                 val work = container.library.cachedWork(id)
                     ?: container.ao3.fetchWork(id).also { container.library.saveWork(it) }
-                _state.update { it.copy(work = convert(work), loading = false) }
+                _state.update { it.copy(work = convert(work), raw = work, loading = false) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -109,7 +111,13 @@ class WorkViewModel(private val container: AppContainer, private val id: Long) :
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun WorkScreen(container: AppContainer, id: Long, onBack: () -> Unit, onRead: (chapter: Int?) -> Unit) {
+fun WorkScreen(
+    container: AppContainer,
+    id: Long,
+    onBack: () -> Unit,
+    onRead: (chapter: Int?) -> Unit,
+    onSearch: (io.github.cyarrow.ao3reader.ao3.SearchQuery) -> Unit = {},
+) {
     val vm: WorkViewModel = viewModel(key = "work-$id") { WorkViewModel(container, id) }
     val state by vm.state.collectAsState()
     val entries by container.library.entries.collectAsState()
@@ -140,10 +148,14 @@ fun WorkScreen(container: AppContainer, id: Long, onBack: () -> Unit, onRead: (c
                 Column(Modifier.padding(horizontal = 20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         (work?.rating ?: summary?.rating)?.let { RatingBadge(it); Spacer(Modifier.width(8.dp)) }
+                        val fandomList = (work?.fandoms ?: summary?.fandoms).orEmpty()
                         Text(
-                            (work?.fandoms ?: summary?.fandoms).orEmpty().joinToString(", "),
-                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline,
+                            fandomList.joinToString(", "),
+                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable(enabled = fandomList.isNotEmpty()) {
+                                onSearch(io.github.cyarrow.ao3reader.ao3.SearchQuery(fandoms = fandomList.first(), sort = io.github.cyarrow.ao3reader.ao3.SearchQuery.Sort.Updated))
+                            },
                         )
                     }
                     Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
@@ -188,10 +200,13 @@ fun WorkScreen(container: AppContainer, id: Long, onBack: () -> Unit, onRead: (c
                     val warnings = (work?.warnings ?: summary?.warnings).orEmpty()
                     if (tags.isNotEmpty() || chars.isNotEmpty() || free.isNotEmpty() || warnings.isNotEmpty()) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val base = io.github.cyarrow.ao3reader.ao3.SearchQuery(sort = io.github.cyarrow.ao3reader.ao3.SearchQuery.Sort.Kudos)
                             warnings.forEach { TagChip(it) }
-                            tags.forEach { TagChip(it, highlighted = true) }
-                            chars.forEach { TagChip(it) }
-                            free.forEach { TagChip(it) }
+                            val raw = state.raw
+                            fun orig(list: List<String>?, i: Int, shown: String) = list?.getOrNull(i) ?: shown
+                            tags.forEachIndexed { i, t -> TagChip(t, highlighted = true) { onSearch(base.copy(relationships = orig(raw?.relationships, i, t))) } }
+                            chars.forEachIndexed { i, t -> TagChip(t) { onSearch(base.copy(characters = orig(raw?.characters, i, t))) } }
+                            free.forEachIndexed { i, t -> TagChip(t) { onSearch(base.copy(freeforms = orig(raw?.freeforms, i, t))) } }
                         }
                     }
 

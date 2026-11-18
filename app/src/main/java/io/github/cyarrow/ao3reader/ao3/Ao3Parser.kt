@@ -57,6 +57,12 @@ object Ao3Parser {
         )
     }
 
+    /** Parses `[{"id": "...", "name": "..."}]` from AO3's autocomplete endpoints. */
+    fun parseAutocomplete(json: String): List<String> = runCatching {
+        kotlinx.serialization.json.Json.parseToJsonElement(json).let { it as kotlinx.serialization.json.JsonArray }
+            .mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.get("name")?.let { n -> (n as kotlinx.serialization.json.JsonPrimitive).content } }
+    }.getOrDefault(emptyList())
+
     // ---------------------------------------------------------------- work page
 
     /** Finds the HTML download link on a work page, or throws if the page is a login wall. */

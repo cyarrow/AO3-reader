@@ -85,6 +85,12 @@ class MainActivity : ComponentActivity() {
                             onOpenSearch = { nav.navigate("search") },
                             onOpenWork = { nav.navigate("work/$it") },
                             onRead = { nav.navigate("reader/$it") },
+                            onSearchFandom = { fandom ->
+                                container.pendingSearch = io.github.cyarrow.ao3reader.ao3.SearchQuery(
+                                    fandoms = fandom, sort = io.github.cyarrow.ao3reader.ao3.SearchQuery.Sort.Updated,
+                                )
+                                nav.navigate("search")
+                            },
                         )
                     }
                     composable("search") {
@@ -97,6 +103,9 @@ class MainActivity : ComponentActivity() {
                                 container.library.update(id) { e -> e?.copy(chapterIndex = chapter, blockIndex = 0, charOffset = 0) }
                             }
                             nav.navigate("reader/$id")
+                        }, onSearch = { q ->
+                            container.pendingSearch = q
+                            nav.navigate("search")
                         })
                     }
                     composable("reader/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->

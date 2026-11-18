@@ -70,6 +70,12 @@ class Ao3ParserTest {
         assertFalse(page.works[1].complete)
     }
 
+    @Test fun parsesAutocomplete() {
+        assertEquals(listOf("ENHYPEN (Band)", "Harry Potter - J. K. Rowling"),
+            Ao3Parser.parseAutocomplete("""[{"id":"ENHYPEN (Band)","name":"ENHYPEN (Band)"},{"id":"x","name":"Harry Potter - J. K. Rowling"}]"""))
+        assertEquals(emptyList<String>(), Ao3Parser.parseAutocomplete("<html>oops</html>"))
+    }
+
     @Test fun parsesWorkIdFromInput() {
         assertEquals(59099647L, parseWorkId("https://archiveofourown.org/works/59099647/chapters/1?view_adult=true"))
         assertEquals(42L, parseWorkId(" 42 "))

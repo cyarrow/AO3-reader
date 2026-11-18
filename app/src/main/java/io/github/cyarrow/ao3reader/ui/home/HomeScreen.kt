@@ -59,6 +59,7 @@ fun HomeScreen(
     onOpenSearch: () -> Unit,
     onOpenWork: (Long) -> Unit,
     onRead: (Long) -> Unit,
+    onSearchFandom: (String) -> Unit = {},
 ) {
     val entries by library.entries.collectAsState()
     val recent = remember(entries) { entries.values.filter { it.lastReadAt > 0 }.sortedByDescending { it.lastReadAt } }
@@ -88,6 +89,20 @@ fun HomeScreen(
                         Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(12.dp))
                         Text(stringResource(R.string.home_search), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            val fandoms = library.favoriteFandoms()
+            if (fandoms.isNotEmpty()) {
+                item {
+                    SectionTitle(stringResource(R.string.home_fandoms))
+                    androidx.compose.foundation.lazy.LazyRow(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(fandoms) { f ->
+                            androidx.compose.material3.AssistChip(onClick = { onSearchFandom(f) }, label = { Text(f, maxLines = 1) })
+                        }
                     }
                 }
             }

@@ -27,6 +27,7 @@ data class LibraryEntry(
     val title: String,
     val authors: List<String>,
     val chapterCount: Int,
+    val fandoms: List<String> = emptyList(),
     val chapterIndex: Int = 0,
     /** Index into the chapter's display blocks, and character offset inside that block. */
     val blockIndex: Int = 0,
@@ -66,8 +67,8 @@ class Library(context: Context) {
         tmp.writeText(json.encodeToString(Work.serializer(), work))
         tmp.renameTo(File(worksDir, "${work.id}.json"))
         update(work.id) { e ->
-            (e ?: LibraryEntry(work.id, work.title, work.authors, work.chapters.size))
-                .copy(title = work.title, authors = work.authors, chapterCount = work.chapters.size)
+            (e ?: LibraryEntry(work.id, work.title, work.authors, work.chapters.size, work.fandoms))
+                .copy(authors = work.authors, chapterCount = work.chapters.size, fandoms = work.fandoms)
         }
     }
 
@@ -90,6 +91,11 @@ class Library(context: Context) {
             )
         }
     }
+
+    /** Fandoms ordered by how many works in the library belong to them. */
+    fun favoriteFandoms(limit: Int = 8): List<String> =
+        _entries.value.values.flatMap { it.fandoms }.groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }.take(limit).map { it.key }
 
     fun remove(id: Long) {
         update(id) { null }

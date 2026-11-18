@@ -35,9 +35,10 @@ class SearchViewModel(private val container: AppContainer) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            val last = container.readerPrefs.lastSearch.first()
-            _state.update { it.copy(query = last) }
-            search(last)
+            val pending = container.pendingSearch?.also { container.pendingSearch = null }
+            val start = pending ?: container.readerPrefs.lastSearch.first()
+            _state.update { it.copy(query = start) }
+            search(start)
         }
     }
 
@@ -60,6 +61,9 @@ class SearchViewModel(private val container: AppContainer) : ViewModel() {
         _state.update { it.copy(loading = true, error = null) }
         job = viewModelScope.launch { load(s.page + 1) }
     }
+
+    suspend fun suggest(type: String, term: String): List<String> =
+        runCatching { container.ao3.autocomplete(type, term) }.getOrDefault(emptyList())
 
     private suspend fun load(page: Int) {
         try {

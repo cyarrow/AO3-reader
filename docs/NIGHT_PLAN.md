@@ -26,3 +26,4 @@
 - ✅ 參考研究：`docs/design/REFERENCES.md`（Apple Books、Kindle、微信讀書、讀墨、Moon+、ReadEra）
 - ✅ 安裝 impeccable 4.9.2（使用者層級），搭配 ui-ux-pro-max 完成第一輪檢視：`docs/design/CRITIQUE-1.md`（26/40）
 - ✅ 閱讀器打磨：全 App 改用紙張暖色主題、章節標題改成「第 N 章」＋標題、實心閱讀選單、章節內進度拖曳、本章剩餘時間、捲動模式頁尾狀態列、App 內亮度、翻頁點擊區首次提示、首頁「繼續閱讀」大卡片
+- ✅ M2 瀏覽：作品頁的配對／角色／標籤／Fandom 可點擊直接搜尋（用 AO3 原始標籤，不受簡轉繁影響）；首頁「常看的 Fandom」捷徑；篩選欄位接上 AO3 標籤自動完成

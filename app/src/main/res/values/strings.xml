@@ -146,4 +146,6 @@
     <string name="reader_tap_hint_ok">Got it</string>
     <string name="home_continue">Continue reading</string>
     <string name="home_history">Reading history</string>
+    <string name="home_fandoms">Your fandoms · latest updates</string>
+    <string name="filter_multiple_hint">Separate multiple with commas</string>
 </resources>

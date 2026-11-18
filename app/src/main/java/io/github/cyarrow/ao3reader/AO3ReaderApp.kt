@@ -51,6 +51,9 @@ class AppContainer(private val app: Application) {
     /** Search results seen recently, so the work page can show details before the full work loads. */
     val summaries = ConcurrentHashMap<Long, WorkSummary>()
 
+    /** A search requested from elsewhere (e.g. tapping a tag); consumed by the next search screen. */
+    @Volatile var pendingSearch: io.github.cyarrow.ao3reader.ao3.SearchQuery? = null
+
     private val converterLock = Mutex()
     private var converterInstance: ChineseConverter? = null
 

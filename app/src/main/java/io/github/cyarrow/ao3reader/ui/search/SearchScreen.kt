@@ -148,7 +148,7 @@ fun SearchScreen(container: AppContainer, onBack: () -> Unit, onOpenWork: (Long)
     }
 
     if (showFilters) {
-        FilterSheet(state.query.copy(query = text), onDismiss = { showFilters = false }) { q ->
+        FilterSheet(state.query.copy(query = text), suggest = vm::suggest, onDismiss = { showFilters = false }) { q ->
             showFilters = false
             vm.search(q)
         }
@@ -205,7 +205,12 @@ private fun sortLabel(s: SearchQuery.Sort) = when (s) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun FilterSheet(initial: SearchQuery, onDismiss: () -> Unit, onApply: (SearchQuery) -> Unit) {
+private fun FilterSheet(
+    initial: SearchQuery,
+    suggest: suspend (String, String) -> List<String>,
+    onDismiss: () -> Unit,
+    onApply: (SearchQuery) -> Unit,
+) {
     var q by remember { mutableStateOf(initial) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
@@ -258,10 +263,10 @@ private fun FilterSheet(initial: SearchQuery, onDismiss: () -> Unit, onApply: (S
             Section(stringResource(R.string.filter_details))
             Field(stringResource(R.string.filter_title), q.title) { q = q.copy(title = it) }
             Field(stringResource(R.string.filter_creators), q.creators) { q = q.copy(creators = it) }
-            Field(stringResource(R.string.filter_fandoms), q.fandoms) { q = q.copy(fandoms = it) }
-            Field(stringResource(R.string.filter_relationships), q.relationships) { q = q.copy(relationships = it) }
-            Field(stringResource(R.string.filter_characters), q.characters) { q = q.copy(characters = it) }
-            Field(stringResource(R.string.filter_tags), q.freeforms) { q = q.copy(freeforms = it) }
+            TagField(stringResource(R.string.filter_fandoms), q.fandoms, "fandom", suggest) { q = q.copy(fandoms = it) }
+            TagField(stringResource(R.string.filter_relationships), q.relationships, "relationship", suggest) { q = q.copy(relationships = it) }
+            TagField(stringResource(R.string.filter_characters), q.characters, "character", suggest) { q = q.copy(characters = it) }
+            TagField(stringResource(R.string.filter_tags), q.freeforms, "freeform", suggest) { q = q.copy(freeforms = it) }
             Field(stringResource(R.string.filter_excluded), q.excludedTags, stringResource(R.string.filter_excluded_hint)) { q = q.copy(excludedTags = it) }
             Field(stringResource(R.string.filter_words), q.words, stringResource(R.string.filter_words_hint)) { q = q.copy(words = it) }
 
@@ -288,4 +293,39 @@ private fun Field(label: String, value: String, hint: String? = null, onChange: 
         supportingText = hint?.let { { Text(it) } },
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     )
+}
+
+/** Comma-separated tag field with AO3 autocomplete for the tag being typed. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagField(
+    label: String,
+    value: String,
+    type: String,
+    suggest: suspend (String, String) -> List<String>,
+    onChange: (String) -> Unit,
+) {
+    var suggestions by remember { mutableStateOf(emptyList<String>()) }
+    val current = value.substringAfterLast(',').trim()
+    LaunchedEffect(current) {
+        suggestions = emptyList()
+        if (current.length < 2) return@LaunchedEffect
+        kotlinx.coroutines.delay(500)
+        suggestions = suggest(type, current).filter { it != current }.take(6)
+    }
+    Field(label, value, stringResource(R.string.filter_multiple_hint), onChange)
+    if (suggestions.isNotEmpty()) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 4.dp)) {
+            suggestions.forEach { tag ->
+                androidx.compose.material3.SuggestionChip(
+                    onClick = {
+                        val prefix = value.substringBeforeLast(',', "").trim()
+                        onChange(if (prefix.isEmpty()) tag else "$prefix, $tag")
+                        suggestions = emptyList()
+                    },
+                    label = { Text(tag, maxLines = 1) },
+                )
+            }
+        }
+    }
 }

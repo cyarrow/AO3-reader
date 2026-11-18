@@ -36,6 +36,13 @@ class Ao3Client(private val client: OkHttpClient) {
         return Ao3Parser.parseDownload(html, id).copy(fetchedAt = System.currentTimeMillis())
     }
 
+    /** AO3's tag autocomplete: type is fandom, relationship, character or freeform. */
+    suspend fun autocomplete(type: String, term: String): List<String> {
+        if (term.isBlank()) return emptyList()
+        val url = "$BASE/autocomplete/$type".toHttpUrl().newBuilder().addQueryParameter("term", term.trim()).build()
+        return Ao3Parser.parseAutocomplete(get(url))
+    }
+
     private suspend fun get(url: HttpUrl): String = mutex.withLock {
         val wait = lastRequestAt + MIN_INTERVAL_MS - System.currentTimeMillis()
         if (wait > 0) delay(wait)
