@@ -35,6 +35,9 @@ data class ReaderSettings(
     val volumeKeys: Boolean = true,
     val tapToTurn: Boolean = true,
     val showNotes: Boolean = true,
+    /** Screen brightness 0..1, or negative to follow the system. */
+    val brightness: Float = -1f,
+    val tapHintShown: Boolean = false,
 )
 
 private val Context.readerStore by preferencesDataStore(name = "reader")

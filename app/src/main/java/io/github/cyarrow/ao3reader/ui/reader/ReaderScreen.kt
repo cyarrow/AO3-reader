@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,6 +45,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +68,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -148,6 +157,7 @@ private fun ReaderBody(
         endNotes = stringResource(R.string.reader_chapter_end_notes),
         workNotes = stringResource(R.string.reader_work_notes),
         workEndNotes = stringResource(R.string.reader_work_end_notes),
+        chapterNumber = chapterFormat(),
     )
     val chapters = remember(st.version, s.showNotes) { buildDisplay(st.work, s.showNotes, labels) }
     val installed by container.fonts.installed.collectAsState()
@@ -174,6 +184,7 @@ private fun ReaderBody(
 
     SystemBars(chromeVisible, colors.isDark)
     KeepScreenOn(s.keepScreenOn)
+    Brightness(s.brightness)
     BackHandler(enabled = chromeVisible) { chromeVisible = false }
 
     // Volume keys / external navigation requests.
@@ -207,6 +218,10 @@ private fun ReaderBody(
             chapterTitle = chapters.getOrNull(position.chapter)?.title.orEmpty(),
             chapterLabel = stringResource(R.string.reader_chapter_of, position.chapter + 1, chapters.size),
             percent = (fraction(chapters, position) * 100).toInt(),
+            minutesLeft = minutesLeftInChapter(chapters, position),
+            blockCount = chapters.getOrNull(position.chapter)?.blocks?.size ?: 1,
+            block = position.block.coerceAtMost((chapters.getOrNull(position.chapter)?.blocks?.size ?: 1) - 1),
+            onSeek = { b -> position = Position(position.chapter, b, 0) },
             hasPrev = position.chapter > 0,
             hasNext = position.chapter < chapters.lastIndex,
             onBack = onBack,
@@ -216,6 +231,11 @@ private fun ReaderBody(
             onToc = { showToc = true },
             onSettings = { showSettings = true; chromeVisible = false },
         )
+
+        if (s.mode == ReadingMode.Paged && s.tapToTurn && !s.tapHintShown) {
+            val scope = rememberCoroutineScope()
+            TapHint(colors) { scope.launch { container.readerPrefs.update { it.copy(tapHintShown = true) } } }
+        }
     }
 
     if (showToc) {
@@ -227,6 +247,19 @@ private fun ReaderBody(
         ReaderSettingsSheet(container, s, st, colors, onWorkConvert = vm::setWorkConvert, onGlobalConvertChanged = vm::applyConversion,
             onOpenFonts = { showSettings = false; onOpenFonts() }) { showSettings = false }
     }
+}
+
+/** Remaining reading time in the current chapter (about 400 CJK characters a minute). */
+private fun minutesLeftInChapter(chapters: List<DisplayChapter>, p: Position): Int {
+    val ch = chapters.getOrNull(p.chapter) ?: return 0
+    val remaining = ch.blocks.drop(p.block.coerceAtMost(ch.blocks.size)).sumOf { it.text.length } - p.char
+    return ((remaining.coerceAtLeast(0) + 399) / 400)
+}
+
+@Composable
+fun chapterFormat(): (Int) -> String {
+    val format = stringResource(R.string.reader_chapter_number)
+    return remember(format) { { n: Int -> format.format(n) } }
 }
 
 private fun fraction(chapters: List<DisplayChapter>, p: Position): Float {
@@ -279,18 +312,38 @@ private fun ScrollReader(
     }
 
     val margin = s.horizontalMargin.dp
-    SelectionContainer {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.displayCutout)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
-            contentPadding = PaddingValues(start = margin, end = margin, top = 40.dp, bottom = 120.dp),
-        ) {
-            itemsIndexed(items, key = { _, it -> "${it.first}-${it.second}" }) { _, (ch, block) ->
-                ScrollBlock(chapters[ch].blocks[block], styles, colors)
+    Column(Modifier.fillMaxSize()) {
+        SelectionContainer(Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.displayCutout)
+                    .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
+                contentPadding = PaddingValues(start = margin, end = margin, top = 40.dp, bottom = 96.dp),
+            ) {
+                itemsIndexed(items, key = { _, it -> "${it.first}-${it.second}" }) { i, (ch, block) ->
+                    val b = chapters[ch].blocks[block]
+                    // Breathing room before every chapter opening after the first.
+                    if (i > 0 && block == 0) Spacer(Modifier.height((s.fontSize * 4).dp))
+                    ScrollBlock(b, styles, colors)
+                }
             }
+        }
+        // Quiet status line, like a running foot in a book.
+        val current = chapters.getOrNull(position.chapter)
+        Row(
+            Modifier.fillMaxWidth().background(colors.background).padding(horizontal = margin).height(28.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                current?.title.orEmpty(), color = colors.secondary, fontSize = 11.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(12.dp))
+            Text("${(fraction(chapters, position) * 100).toInt()}%", color = colors.secondary, fontSize = 11.sp)
+            Spacer(Modifier.width(12.dp))
+            Clock(colors, 11)
         }
     }
 }
@@ -366,6 +419,15 @@ private fun PagedReader(
                 }
             }
             LaunchedEffect(navCounter) { if (navCounter != 0) turn(navRequest) }
+            // External jumps inside this chapter (progress slider).
+            LaunchedEffect(position.block, position.char) {
+                if (position.block == Int.MAX_VALUE) return@LaunchedEffect
+                val idx = pageList.indexOfPosition(position.block, position.char) + lead
+                val shownIdx = pagerState.settledPage - lead
+                val shownFirst = pageList.getOrNull(shownIdx)?.first
+                val sameAsShown = shownFirst != null && pageList.indexOfPosition(shownFirst.blockIndex, shownFirst.start) + lead == idx
+                if (!sameAsShown && idx != pagerState.currentPage) pagerState.scrollToPage(idx)
+            }
 
             HorizontalPager(
                 state = pagerState,
@@ -391,7 +453,8 @@ private fun PagedReader(
                         }
                 ) {
                     Box(Modifier.height(headerH).fillMaxWidth(), contentAlignment = Alignment.BottomStart) {
-                        Text(
+                        // The chapter's opening page already shows its title in full.
+                        if (idx > 0) Text(
                             chapter.title, color = colors.secondary, fontSize = 12.sp, maxLines = 1,
                             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 8.dp),
                         )
@@ -416,6 +479,28 @@ private fun PagedReader(
     }
 }
 
+/** One-time explanation of the paged-mode tap zones. */
+@Composable
+private fun TapHint(colors: ReaderColors, onDismiss: () -> Unit) {
+    val scrim = if (colors.isDark) Color.Black.copy(alpha = 0.72f) else Color(0xFF1B1916).copy(alpha = 0.62f)
+    Row(
+        Modifier.fillMaxSize().background(scrim).pointerInput(Unit) { detectTapGestures { onDismiss() } },
+    ) {
+        listOf(R.string.reader_tap_hint_left, R.string.reader_tap_hint_center, R.string.reader_tap_hint_right).forEachIndexed { i, label ->
+            Box(
+                Modifier.weight(1f).fillMaxSize()
+                    .background(if (i == 1) Color.White.copy(alpha = 0.06f) else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(label), color = Color.White, fontSize = 16.sp, textAlign = TextAlign.Center)
+            }
+        }
+    }
+    Box(Modifier.fillMaxSize().padding(bottom = 64.dp), contentAlignment = Alignment.BottomCenter) {
+        Button(onClick = onDismiss) { Text(stringResource(R.string.reader_tap_hint_ok)) }
+    }
+}
+
 @Composable
 private fun ChapterEdge(label: String, title: String, colors: ReaderColors) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -426,7 +511,7 @@ private fun ChapterEdge(label: String, title: String, colors: ReaderColors) {
 }
 
 @Composable
-private fun Clock(colors: ReaderColors) {
+private fun Clock(colors: ReaderColors, sizeSp: Int = 12) {
     val context = LocalContext.current
     val time by produceState(initialValue = "") {
         val format = android.text.format.DateFormat.getTimeFormat(context)
@@ -435,7 +520,7 @@ private fun Clock(colors: ReaderColors) {
             delay(30_000)
         }
     }
-    Text(time, color = colors.secondary, fontSize = 12.sp)
+    Text(time, color = colors.secondary, fontSize = sizeSp.sp)
 }
 
 // ------------------------------------------------------------------------------------------ chrome
@@ -448,6 +533,10 @@ private fun ReaderChrome(
     chapterTitle: String,
     chapterLabel: String,
     percent: Int,
+    minutesLeft: Int,
+    blockCount: Int,
+    block: Int,
+    onSeek: (Int) -> Unit,
     hasPrev: Boolean,
     hasNext: Boolean,
     onBack: () -> Unit,
@@ -457,12 +546,14 @@ private fun ReaderChrome(
     onToc: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val bar = colors.background.copy(alpha = 0.97f)
+    val bar = colors.background
+    val line = colors.secondary.copy(alpha = 0.18f)
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { -it }, exit = fadeOut() + slideOutVertically { -it },
             modifier = Modifier.align(Alignment.TopCenter)) {
+            Column(Modifier.fillMaxWidth().shadow(6.dp).background(bar)) {
             Row(
-                Modifier.fillMaxWidth().background(bar).windowInsetsPadding(WindowInsets.statusBars).padding(4.dp),
+                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
@@ -476,20 +567,40 @@ private fun ReaderChrome(
                     Icon(Icons.Filled.Refresh, stringResource(R.string.reader_refresh), tint = colors.text)
                 }
             }
+            HorizontalDivider(color = line)
+            }
         }
         AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { it }, exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier.align(Alignment.BottomCenter)) {
-            Column(Modifier.fillMaxWidth().background(bar).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 8.dp, vertical = 6.dp)) {
-                Text(
-                    "$chapterLabel · $percent%", color = colors.secondary, fontSize = 12.sp,
-                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                )
+            Column(Modifier.fillMaxWidth().shadow(6.dp).background(bar).windowInsetsPadding(WindowInsets.navigationBars)) {
+                HorizontalDivider(color = line)
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(chapterLabel, color = colors.text, fontSize = 13.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        if (minutesLeft <= 1) stringResource(R.string.reader_chapter_almost_done)
+                        else stringResource(R.string.reader_minutes_left, minutesLeft),
+                        color = colors.secondary, fontSize = 12.sp,
+                    )
+                    Text(" · $percent%", color = colors.secondary, fontSize = 12.sp)
+                }
+                if (blockCount > 1) {
+                    Slider(
+                        value = block.toFloat(),
+                        onValueChange = { onSeek(it.toInt()) },
+                        valueRange = 0f..(blockCount - 1).toFloat(),
+                        colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent,
+                            inactiveTrackColor = colors.secondary.copy(alpha = 0.25f)),
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     ChromeButton(Icons.Filled.ChevronLeft, stringResource(R.string.reader_prev_chapter), colors, hasPrev, onPrev)
                     ChromeButton(Icons.AutoMirrored.Filled.List, stringResource(R.string.reader_toc), colors, true, onToc)
                     ChromeButton(Icons.Filled.TextFields, stringResource(R.string.reader_appearance), colors, true, onSettings)
                     ChromeButton(Icons.Filled.ChevronRight, stringResource(R.string.reader_next_chapter), colors, hasNext, onNext)
                 }
+                Spacer(Modifier.height(6.dp))
             }
         }
     }
@@ -504,8 +615,15 @@ private fun ChromeButton(
     onClick: () -> Unit,
 ) {
     val tint = if (enabled) colors.text else colors.secondary.copy(alpha = 0.4f)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(onClick = onClick, enabled = enabled) { Icon(icon, label, tint = tint, modifier = Modifier.size(26.dp)) }
+    // Icon and label form one large touch target.
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.padding(4.dp).size(24.dp))
         Text(label, color = tint, fontSize = 11.sp)
     }
 }
@@ -529,6 +647,22 @@ private fun SystemBars(chromeVisible: Boolean, dark: Boolean) {
         onDispose {
             val controller = WindowCompat.getInsetsController(activity.window, view)
             controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+}
+
+@Composable
+private fun Brightness(value: Float) {
+    val activity = LocalContext.current as? Activity ?: return
+    DisposableEffect(value) {
+        val window = activity.window
+        window.attributes = window.attributes.apply {
+            screenBrightness = if (value < 0f) android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE else value.coerceIn(0.01f, 1f)
+        }
+        onDispose {
+            window.attributes = window.attributes.apply {
+                screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            }
         }
     }
 }

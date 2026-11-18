@@ -115,11 +115,24 @@ fun ReaderSettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.background,
+        containerColor = androidx.compose.ui.graphics.lerp(colors.background, colors.text, 0.05f),
+        tonalElevation = 0.dp,
         contentColor = colors.text,
         scrimColor = Color.Transparent,
     ) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
+            // Brightness (in-app, so night reading doesn't need the system panel)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Label(stringResource(R.string.reader_brightness), colors, Modifier.weight(1f))
+                Text(stringResource(R.string.reader_brightness_system), color = colors.secondary, fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 10.dp, end = 8.dp))
+                Switch(s.brightness < 0f, { follow -> update { it.copy(brightness = if (follow) -1f else 0.5f) } },
+                    modifier = Modifier.padding(top = 8.dp))
+            }
+            if (s.brightness >= 0f) {
+                Slider(s.brightness, { v -> update { it.copy(brightness = v) } }, valueRange = 0.01f..1f, colors = sliderColors)
+            }
+
             // Font size
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Label(stringResource(R.string.reader_font_size), colors, Modifier.weight(1f))

@@ -73,6 +73,8 @@ class ReaderViewModel(private val container: AppContainer, private val workId: L
                 withContext(Dispatchers.Default) { WorkConversion(converter, settings.taiwanPhrases).work(work) }
             } else work
             _state.value = ReaderState.Ready(shown, simplified, shouldConvert, workMode, ++version)
+            // Keep the library in the script the reader sees.
+            container.library.update(workId) { it?.copy(title = shown.title) }
         }
     }
 

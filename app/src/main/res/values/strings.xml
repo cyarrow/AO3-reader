@@ -135,4 +135,15 @@
     <string name="work_open_browser">Open in browser</string>
     <string name="work_start">Start reading</string>
     <string name="work_summary">Summary</string>
+    <string name="reader_chapter_number">Chapter %1$d</string>
+    <string name="reader_minutes_left">%1$d min left in chapter</string>
+    <string name="reader_chapter_almost_done">Almost done with chapter</string>
+    <string name="reader_brightness">Brightness</string>
+    <string name="reader_brightness_system">System</string>
+    <string name="reader_tap_hint_left">Previous page</string>
+    <string name="reader_tap_hint_center">Menu</string>
+    <string name="reader_tap_hint_right">Next page</string>
+    <string name="reader_tap_hint_ok">Got it</string>
+    <string name="home_continue">Continue reading</string>
+    <string name="home_history">Reading history</string>
 </resources>

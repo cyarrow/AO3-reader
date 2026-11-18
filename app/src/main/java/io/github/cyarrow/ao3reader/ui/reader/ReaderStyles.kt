@@ -42,7 +42,9 @@ class ReaderStyles(
             else -> TextAlign.Start
         }
         return when (block.type) {
-            Type.ChapterTitle -> base(1.25f, colors.text, settings.fontWeight + 200, 1.5f).copy(textAlign = TextAlign.Center)
+            Type.ChapterNumber -> base(0.8f, colors.accent, settings.fontWeight + 100, 1.6f)
+                .copy(textAlign = TextAlign.Center, letterSpacing = (size * 0.8f * 0.15f).sp)
+            Type.ChapterTitle -> base(1.3f, colors.text, settings.fontWeight + 200, 1.45f).copy(textAlign = TextAlign.Center)
             Type.Label -> base(0.78f, colors.accent, settings.fontWeight + 200, 1.5f)
             Type.Meta -> base(0.86f, colors.secondary, lineHeight = (settings.lineHeight - 0.2f).coerceAtLeast(1.3f))
                 .copy(textAlign = if (block.center) TextAlign.Center else TextAlign.Start)
@@ -59,7 +61,8 @@ class ReaderStyles(
 
     fun spacingAfterPx(block: DisplayBlock): Int = with(density) {
         val em = when (block.type) {
-            Type.ChapterTitle -> 1.8f
+            Type.ChapterNumber -> 0.5f
+            Type.ChapterTitle -> 2.2f
             Type.Label -> 0.35f
             Type.Meta -> 0.45f
             Type.Divider -> 0f

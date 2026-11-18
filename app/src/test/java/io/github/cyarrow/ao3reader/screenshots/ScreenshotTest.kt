@@ -4,10 +4,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import io.github.cyarrow.ao3reader.AO3ReaderApp
 import io.github.cyarrow.ao3reader.ao3.Ao3Parser
 import io.github.cyarrow.ao3reader.ao3.Work
@@ -37,7 +40,7 @@ import java.io.File
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
+@Config(sdk = [35], qualifiers = "zh-rTW-w411dp-h891dp-xxhdpi")
 class ScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -64,12 +67,25 @@ class ScreenshotTest {
     /** Lets background work (dictionary loading, pagination) finish and recompose. */
     private fun settle() = repeat(25) { Thread.sleep(200); compose.waitForIdle() }
 
-    @Test fun readerPagedPaper() { settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper) }; reader("reader_paged_paper") }
+    @Test fun readerPagedPaper() { settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper, tapHintShown = true) }; reader("reader_paged_paper") }
     @Test fun readerScrollLight() { settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Light) }; reader("reader_scroll_light") }
     @Test fun readerScrollDark() { settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Dark) }; reader("reader_scroll_dark") }
 
+    @Test fun readerTapHint() { settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper) }; reader("reader_tap_hint") }
+
+    @Test fun readerSettingsSheet() {
+        settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(center) }
+        settle()
+        compose.onNodeWithText("顯示").performClick()
+        settle()
+        captureScreenRoboImage(File(out, "reader_settings.png").path)
+    }
+
     @Test fun readerChrome() {
-        settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper) }
+        settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
         compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
         settle()
         compose.onRoot().performTouchInput { click(center) }

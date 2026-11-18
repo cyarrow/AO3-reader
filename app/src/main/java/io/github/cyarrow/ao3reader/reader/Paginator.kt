@@ -42,8 +42,9 @@ class Paginator(
                 current += Slice(index, 0, 0)
                 return@forEachIndexed
             }
-            // Chapter titles always start on a fresh page.
-            if (block.type == DisplayBlock.Type.ChapterTitle) newPage()
+            // A chapter opening always starts on a fresh page.
+            if (block.type == DisplayBlock.Type.ChapterNumber ||
+                (block.type == DisplayBlock.Type.ChapterTitle && index == 0)) newPage()
             val layout = measurer.measure(
                 block.text,
                 style = styleFor(block, true),

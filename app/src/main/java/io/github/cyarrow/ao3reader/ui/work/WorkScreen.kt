@@ -53,6 +53,8 @@ import io.github.cyarrow.ao3reader.ao3.Work
 import io.github.cyarrow.ao3reader.ao3.WorkSummary
 import io.github.cyarrow.ao3reader.data.ConvertMode
 import io.github.cyarrow.ao3reader.reader.WorkConversion
+import io.github.cyarrow.ao3reader.reader.chapterListTitle
+import io.github.cyarrow.ao3reader.ui.reader.chapterFormat
 import io.github.cyarrow.ao3reader.reader.textSample
 import io.github.cyarrow.ao3reader.ui.common.RatingBadge
 import io.github.cyarrow.ao3reader.ui.common.TagChip
@@ -116,6 +118,7 @@ fun WorkScreen(container: AppContainer, id: Long, onBack: () -> Unit, onRead: (c
 
     val work = state.work
     val summary = state.summary
+    val chapterNumber = chapterFormat()
     val title = work?.title ?: summary?.title.orEmpty()
     val authors = work?.authors ?: summary?.authors.orEmpty()
 
@@ -216,7 +219,7 @@ fun WorkScreen(container: AppContainer, id: Long, onBack: () -> Unit, onRead: (c
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            ch.title.ifBlank { work.title },
+                            chapterListTitle(ch.title, chapterNumber, work.title),
                             style = MaterialTheme.typography.bodyLarge,
                             color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,

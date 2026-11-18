@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,34 +99,20 @@ fun HomeScreen(
                     }
                 }
             } else {
+                val first = recent.first()
                 item {
-                    Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp))
+                    SectionTitle(stringResource(R.string.home_continue))
+                    ContinueCard(first, onRead = { onRead(first.workId) }, onDetails = { onOpenWork(first.workId) },
+                        onLongClick = { removing = first })
                 }
-                items(recent, key = { it.workId }) { e ->
-                    Column(
-                        Modifier.fillMaxWidth()
-                            .combinedClickable(onClick = { onRead(e.workId) }, onLongClick = { removing = e })
-                            .padding(horizontal = 20.dp, vertical = 12.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(e.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    e.authors.joinToString(", ") + " · " + stringResource(R.string.reader_chapter_of, e.chapterIndex + 1, e.chapterCount),
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            TextButton(onClick = { onOpenWork(e.workId) }) { Text(stringResource(R.string.home_details)) }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LinearProgressIndicator(progress = { e.fraction }, modifier = Modifier.weight(1f).padding(vertical = 6.dp))
-                            Text("${(e.fraction * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        }
+                if (recent.size > 1) {
+                    item { SectionTitle(stringResource(R.string.home_history)) }
+                    items(recent.drop(1), key = { it.workId }) { e ->
+                        HistoryRow(e, onClick = { onRead(e.workId) }, onLongClick = { removing = e })
                     }
                 }
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
@@ -150,5 +139,68 @@ fun HomeScreen(
             confirmButton = { TextButton(onClick = { library.remove(e.workId); removing = null }) { Text(stringResource(R.string.remove)) } },
             dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(R.string.cancel)) } },
         )
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 8.dp))
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ContinueCard(e: LibraryEntry, onRead: () -> Unit, onDetails: () -> Unit, onLongClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            .combinedClickable(onClick = onRead, onLongClick = onLongClick),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Text(e.title, style = MaterialTheme.typography.headlineSmall, fontFamily = FontFamily.Serif,
+                fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(e.authors.joinToString(", "), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.reader_chapter_of, e.chapterIndex + 1, e.chapterCount),
+                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.weight(1f))
+                Text("${(e.fraction * 100).toInt()}%", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+            LinearProgressIndicator(progress = { e.fraction }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                drawStopIndicator = {})
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onRead, modifier = Modifier.weight(1f).height(48.dp)) {
+                    Text(stringResource(R.string.home_continue))
+                }
+                OutlinedButton(onClick = onDetails, modifier = Modifier.height(48.dp)) {
+                    Text(stringResource(R.string.home_details))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HistoryRow(e: LibraryEntry, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(e.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                e.authors.joinToString(", ") + " · " + stringResource(R.string.reader_chapter_of, e.chapterIndex + 1, e.chapterCount),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text("${(e.fraction * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
     }
 }
