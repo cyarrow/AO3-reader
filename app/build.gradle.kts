@@ -58,6 +58,9 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
     androidResources {
         @Suppress("UnstableApiUsage")
         localeFilters += listOf("en", "zh-rTW")
@@ -85,6 +88,24 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.jsoup)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// Optional local fixtures (real AO3 downloads that must not be committed): -PlocalFixtures=/path/to/dir
+// Screenshots (Roborazzi) are only recorded on demand: -Pscreenshots
+tasks.withType<Test>().configureEach {
+    (findProperty("localFixtures") as String?)?.let { systemProperty("localFixtures", it) }
+    val record = project.hasProperty("screenshots")
+    systemProperty("roborazzi.test.record", record.toString())
+    systemProperty("screenshots", record.toString())
+    systemProperty("robolectric.pixelCopyRenderMode", "hardware")
+    maxHeapSize = "3g"
 }
