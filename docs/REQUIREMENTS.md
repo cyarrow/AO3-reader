@@ -71,27 +71,39 @@
 - Kotlin、Jetpack Compose、Material 3
 - 網路與解析：OkHttp（含 CookieJar）、Jsoup
 - 本地資料：Room（作品、章節、進度、下載）、DataStore（設定）
-- 架構：MVVM、Repository；以 Hilt 做依賴注入
+- 架構：MVVM、Repository；手動依賴注入（AppContainer），App 規模小，不引入 Hilt
 - 閱讀器：Compose 原生排版，翻頁模式自行分頁（不使用 WebView，閱讀體驗較能控制）
 - 建置：Gradle，搭配 GitHub Actions 自動產出 APK
 
-## 6. 建置與更新
+## 6. 中文閱讀
+- **簡轉繁**：用 OpenCC 做離線字元轉換（不是 AI 翻譯）。偵測到簡體作品時自動轉成繁體，每部作品都可以個別關閉；可另外選擇是否把用詞也轉成台灣慣用語（例如「軟件」轉成「軟體」）
+- **字型**：APK 只內建一套同時涵蓋簡繁的字型，其他字型（思源宋體、霞鶩文楷、芫荽、思源黑體等）在 App 內下載
+  - 設定頁可以即時預覽同一段文字，方便比較字型
+  - 可調整字重（目前的細黑體太細、難讀）
+  - 也可以匯入自己的字型檔
+- 中文排版：段首縮排（可開關）、標點擠壓、行距預設偏寬
+
+## 7. 建置與更新
 - GitHub Actions：每次 push 都建置 debug APK；打上 `v*` tag 時，建置已簽章的 release APK 並發佈到 GitHub Releases
 - 簽章：release keystore 以 Base64 編碼存成 GitHub Secrets（每次都用同一把金鑰，App 才能覆蓋安裝更新）
 - App 內更新：啟動時（或在設定頁手動）查詢 GitHub Releases 的最新版本，比對 versionCode；有新版就下載 APK，並交由系統安裝程式安裝（需要 `REQUEST_INSTALL_PACKAGES` 權限）
 
-## 7. 開發階段（閱讀器優先）
+## 8. 開發階段（閱讀器優先）
 1. **M0 專案骨架**：Gradle、Compose、CI 建置、Release 流程、App 內更新
 2. **M1 閱讀器**：輸入作品連結或 ID 即可閱讀；完整閱讀設定；兩種閱讀模式；記住閱讀進度；快取
 3. **M2 瀏覽與搜尋**：Fandom 與標籤列表、進階搜尋、作品詳情頁
 4. **M3 帳號**：登入、Kudos、書籤、Marked for Later、閱讀紀錄、訂閱
 5. **M4 離線**：下載、本地書架、檢查新章節
-6. 之後：依使用心得持續打磨閱讀器，再考慮第二版候選功能
+6. **介面檢視**：第一版完成後，在開發環境安裝 impeccable，搭配 ui-ux-pro-max 檢視並改進介面設計，以閱讀舒適度和好用程度為最高優先
+7. 之後：依使用心得持續打磨閱讀器，再考慮第二版候選功能
 
-## 8. 已確認決策
+## 9. 已確認決策
 - 自己使用，側載安裝，不上架
 - MVP 功能：瀏覽與搜尋、閱讀器、登入、離線下載
 - 閱讀模式：上下捲動與左右翻頁，可切換
 - 介面語言：中英雙語
 - 用 GitHub Actions 建置，App 內自動檢查並更新
 - 開發順序：閱讀器優先；第二版候選功能先不提前，資源集中在閱讀器打磨
+- 簡體作品自動轉繁（OpenCC），每部作品可個別關閉
+- 字型：內建一套，其他在 App 內下載
+- 簽章金鑰由開發端產生，使用者自行存進 GitHub Secrets（不進 repo）

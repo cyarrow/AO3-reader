@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_placeholder">閱讀器會在下一個階段加入。目前可以到「設定」檢查更新。</string>
+    <string name="settings">設定</string>
+    <string name="back">返回</string>
+    <string name="settings_section_about">關於</string>
+    <string name="settings_version">版本</string>
+    <string name="settings_section_update">更新</string>
+    <string name="settings_auto_check">啟動時檢查更新</string>
+    <string name="settings_auto_check_desc">每天最多檢查一次</string>
+    <string name="settings_check_now">立即檢查更新</string>
+    <string name="update_checking">檢查中…</string>
+    <string name="update_up_to_date">已經是最新版本</string>
+    <string name="update_failed">檢查更新失敗：%1$s</string>
+    <string name="update_debug_disabled">Debug 版本不提供更新</string>
+    <string name="update_available_title">有新版本：%1$s</string>
+    <string name="update_current_version">目前版本：%1$s</string>
+    <string name="update_download_install">下載並安裝</string>
+    <string name="update_later">稍後</string>
+    <string name="update_skip">略過這個版本</string>
+    <string name="update_downloading">下載中… %1$d%%</string>
+    <string name="update_download_failed">下載失敗：%1$s</string>
+    <string name="update_need_permission">請允許本 App 安裝更新，再重試一次。</string>
+    <string name="update_open_settings">前往設定</string>
+    <string name="cancel">取消</string>
+    <string name="retry">重試</string>
+</resources>
