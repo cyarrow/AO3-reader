@@ -43,19 +43,33 @@ class Ao3Client(private val client: OkHttpClient) {
         return Ao3Parser.parseAutocomplete(get(url))
     }
 
-    private suspend fun get(url: HttpUrl): String = mutex.withLock {
+    /** Result of a raw request: final URL after redirects and the body. */
+    data class Page(val url: String, val html: String)
+
+    /** GET without login-wall detection, for pages that may legitimately be the login form. */
+    suspend fun fetch(url: String): Page = request(Request.Builder().url(url).build(), allowLogin = true)
+
+    suspend fun post(url: String, fields: List<Pair<String, String>>, referer: String? = null): Page {
+        val body = okhttp3.FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build()
+        val req = Request.Builder().url(url).post(body).apply { if (referer != null) header("Referer", referer) }.build()
+        return request(req, allowLogin = true)
+    }
+
+    private suspend fun get(url: HttpUrl): String = request(Request.Builder().url(url).build(), allowLogin = false).html
+
+    private suspend fun request(request: Request, allowLogin: Boolean): Page = mutex.withLock {
         val wait = lastRequestAt + MIN_INTERVAL_MS - System.currentTimeMillis()
         if (wait > 0) delay(wait)
         try {
             withContext(Dispatchers.IO) {
-                client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                client.newCall(request).execute().use { resp ->
                     when {
                         resp.code == 429 -> throw Ao3Exception.RateLimited(resp.header("Retry-After")?.toLongOrNull())
                         resp.code == 404 -> throw Ao3Exception.NotFound()
-                        resp.request.url.encodedPath.startsWith("/users/login") -> throw Ao3Exception.NeedsLogin()
-                        !resp.isSuccessful -> throw Ao3Exception.Unavailable(resp.code)
+                        !allowLogin && resp.request.url.encodedPath.startsWith("/users/login") -> throw Ao3Exception.NeedsLogin()
+                        !resp.isSuccessful && resp.code != 422 -> throw Ao3Exception.Unavailable(resp.code)
                     }
-                    resp.body.string()
+                    Page(resp.request.url.toString(), resp.body.string())
                 }
             }
         } finally {

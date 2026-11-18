@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
                         container.updateManager.autoCheck()?.let { pendingUpdate = it }
                     }
                 }
+                LaunchedEffect(Unit) { container.account.verify() }
                 LaunchedEffect(Unit) {
                     incomingWork.collect { id ->
                         if (id != null) {
@@ -79,7 +81,10 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(nav, startDestination = "home") {
                     composable("home") {
+                        val user by container.account.user.collectAsState()
                         HomeScreen(
+                            user = user,
+                            onOpenList = { nav.navigate("list/${it.name}") },
                             library = container.library,
                             onOpenSettings = { nav.navigate("settings") },
                             onOpenSearch = { nav.navigate("search") },
@@ -112,6 +117,13 @@ class MainActivity : ComponentActivity() {
                         val id = entry.arguments!!.getLong("id")
                         ReaderScreen(container, id, onBack = { nav.popBackStack() }, onOpenFonts = { nav.navigate("fonts") })
                     }
+                    composable("login") {
+                        io.github.cyarrow.ao3reader.ui.account.LoginScreen(container, onBack = { nav.popBackStack() }, onLoggedIn = { nav.popBackStack() })
+                    }
+                    composable("list/{kind}") { entry ->
+                        val kind = io.github.cyarrow.ao3reader.account.AccountManager.ListKind.valueOf(entry.arguments!!.getString("kind")!!)
+                        io.github.cyarrow.ao3reader.ui.account.UserListScreen(container, kind, onBack = { nav.popBackStack() }, onOpenWork = { nav.navigate("work/$it") })
+                    }
                     composable("fonts") {
                         FontsScreen(container, onBack = { nav.popBackStack() })
                     }
@@ -121,6 +133,9 @@ class MainActivity : ComponentActivity() {
                             updateManager = container.updateManager,
                             onUpdateFound = { pendingUpdate = it },
                             onBack = { nav.popBackStack() },
+                            account = container.account,
+                            onLogin = { nav.navigate("login") },
+                            onFonts = { nav.navigate("fonts") },
                         )
                     }
                 }

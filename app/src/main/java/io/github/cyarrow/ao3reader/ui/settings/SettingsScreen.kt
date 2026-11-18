@@ -42,6 +42,9 @@ fun SettingsScreen(
     updateManager: UpdateManager,
     onUpdateFound: (UpdateInfo) -> Unit,
     onBack: () -> Unit,
+    account: io.github.cyarrow.ao3reader.account.AccountManager? = null,
+    onLogin: () -> Unit = {},
+    onFonts: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val autoCheck by settings.autoCheckUpdates.collectAsState(initial = true)
@@ -65,6 +68,34 @@ fun SettingsScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            if (account != null) {
+                val user by account.user.collectAsState()
+                SectionHeader(stringResource(R.string.account_section))
+                if (user == null) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.login_title)) },
+                        supportingContent = { Text(stringResource(R.string.account_login_desc)) },
+                        modifier = Modifier.clickable(onClick = onLogin),
+                    )
+                } else {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.account_logged_in_as, user!!)) },
+                        trailingContent = {
+                            androidx.compose.material3.TextButton(onClick = { scope.launch { account.logout() } }) {
+                                Text(stringResource(R.string.account_logout))
+                            }
+                        },
+                    )
+                }
+                HorizontalDivider()
+            }
+            SectionHeader(stringResource(R.string.reader_appearance))
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.fonts_title)) },
+                supportingContent = { Text(stringResource(R.string.settings_fonts_desc)) },
+                modifier = Modifier.clickable(onClick = onFonts),
+            )
+            HorizontalDivider()
             SectionHeader(stringResource(R.string.settings_section_update))
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_auto_check)) },

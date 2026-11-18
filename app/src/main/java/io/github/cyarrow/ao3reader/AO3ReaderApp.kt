@@ -29,7 +29,12 @@ class AO3ReaderApp : Application() {
 
 /** Simple manual dependency container shared across the app. */
 class AppContainer(private val app: Application) {
+    val cookieJar = io.github.cyarrow.ao3reader.account.PersistentCookieJar(
+        runCatching { io.github.cyarrow.ao3reader.account.SecureStore(app, "cookies") }.getOrNull()
+    )
+
     val httpClient: OkHttpClient = OkHttpClient.Builder()
+        .cookieJar(cookieJar)
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .addInterceptor { chain ->
@@ -44,6 +49,9 @@ class AppContainer(private val app: Application) {
     val settings = SettingsRepository(app)
     val updateManager = UpdateManager(app, httpClient, settings)
     val ao3 = Ao3Client(httpClient)
+    val account = io.github.cyarrow.ao3reader.account.AccountManager(
+        ao3, cookieJar, io.github.cyarrow.ao3reader.account.SecureStore(app, "account"),
+    )
     val library = Library(app)
     val readerPrefs = ReaderPreferences(app)
     val fonts = FontRepository(app, httpClient)

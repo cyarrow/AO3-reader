@@ -35,6 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -194,6 +195,9 @@ fun WorkScreen(
                         }
                     }
 
+                    val user by container.account.user.collectAsState()
+                    if (user != null) AccountActions(container, id)
+
                     val tags = (work?.relationships ?: summary?.relationships).orEmpty()
                     val chars = (work?.characters ?: summary?.characters).orEmpty()
                     val free = (work?.freeforms ?: summary?.freeforms).orEmpty()
@@ -256,5 +260,62 @@ fun WorkScreen(
             }
             item { Spacer(Modifier.height(32.dp)) }
         }
+    }
+}
+
+/** Kudos, bookmark and Marked for Later, shown when logged in. */
+@Composable
+private fun AccountActions(container: AppContainer, id: Long) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var message by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var busy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showBookmark by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val kudosDone = stringResource(R.string.action_kudos_done)
+    val laterDone = stringResource(R.string.action_later_done)
+    val bookmarkDone = stringResource(R.string.action_bookmark_done)
+    val failed = stringResource(R.string.action_failed)
+
+    fun run(done: String, block: suspend () -> String?) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            message = try { block() ?: done } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { failed.format(e.message.orEmpty()) }
+            busy = false
+        }
+    }
+
+    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.FilledTonalButton(onClick = { run(kudosDone) { container.account.kudos(id) } }, enabled = !busy,
+            modifier = Modifier.weight(1f)) { Text("♥ Kudos", maxLines = 1) }
+        androidx.compose.material3.FilledTonalButton(onClick = { showBookmark = true }, enabled = !busy,
+            modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_bookmark), maxLines = 1) }
+        androidx.compose.material3.FilledTonalButton(onClick = { run(laterDone) { container.account.markForLater(id); null } }, enabled = !busy,
+            modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_later), maxLines = 1) }
+    }
+    message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 8.dp)) }
+
+    if (showBookmark) {
+        var notes by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+        var private by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showBookmark = false },
+            title = { Text(stringResource(R.string.action_bookmark)) },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.action_bookmark_notes)) }, minLines = 2)
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).clickable { private = !private }) {
+                        androidx.compose.material3.Checkbox(private, { private = it })
+                        Text(stringResource(R.string.action_bookmark_private))
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showBookmark = false
+                    run(bookmarkDone) { container.account.bookmark(id, notes, private) }
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showBookmark = false }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 }

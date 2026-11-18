@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.cyarrow.ao3reader.R
+import io.github.cyarrow.ao3reader.ui.account.titleRes
 import io.github.cyarrow.ao3reader.ao3.parseWorkId
 import io.github.cyarrow.ao3reader.data.Library
 import io.github.cyarrow.ao3reader.data.LibraryEntry
@@ -60,6 +61,8 @@ fun HomeScreen(
     onOpenWork: (Long) -> Unit,
     onRead: (Long) -> Unit,
     onSearchFandom: (String) -> Unit = {},
+    user: String? = null,
+    onOpenList: (io.github.cyarrow.ao3reader.account.AccountManager.ListKind) -> Unit = {},
 ) {
     val entries by library.entries.collectAsState()
     val recent = remember(entries) { entries.values.filter { it.lastReadAt > 0 }.sortedByDescending { it.lastReadAt } }
@@ -89,6 +92,18 @@ fun HomeScreen(
                         Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(12.dp))
                         Text(stringResource(R.string.home_search), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (user != null) {
+                item {
+                    SectionTitle(stringResource(R.string.account_my_ao3, user))
+                    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        io.github.cyarrow.ao3reader.account.AccountManager.ListKind.entries.forEach { k ->
+                            androidx.compose.material3.FilledTonalButton(onClick = { onOpenList(k) }, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(k.titleRes()), maxLines = 1)
+                            }
+                        }
                     }
                 }
             }
