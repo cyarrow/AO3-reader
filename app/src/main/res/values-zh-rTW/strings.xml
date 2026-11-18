@@ -174,4 +174,16 @@
     <string name="action_later">稍後閱讀</string>
     <string name="action_failed">失敗：%1$s</string>
     <string name="list_empty">這裡還沒有作品</string>
+    <string name="tab_reading">閱讀</string>
+    <string name="tab_search">搜尋</string>
+    <string name="tab_shelf">書架</string>
+    <string name="shelf_title">書架</string>
+    <string name="shelf_check">檢查新章節</string>
+    <string name="shelf_all">全部（%1$d）</string>
+    <string name="shelf_updates">有新章節（%1$d）</string>
+    <string name="shelf_offline_note">開啟過的作品都會存在手機上，可以離線閱讀。長按可移除。</string>
+    <string name="shelf_empty">書架是空的。開啟過的作品會自動存到這裡。</string>
+    <string name="shelf_no_updates">沒有新章節。點右上角 ↻ 檢查。</string>
+    <string name="shelf_new_chapters">有新章節 · 目前 %1$s</string>
+    <string name="shelf_update">更新</string>
 </resources>

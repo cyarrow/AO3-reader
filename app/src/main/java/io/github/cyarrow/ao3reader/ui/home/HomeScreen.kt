@@ -95,6 +95,21 @@ fun HomeScreen(
                     }
                 }
             }
+            if (recent.isEmpty()) {
+                item {
+                    Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.home_empty), textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                val first = recent.first()
+                item {
+                    SectionTitle(stringResource(R.string.home_continue))
+                    ContinueCard(first, onRead = { onRead(first.workId) }, onDetails = { onOpenWork(first.workId) },
+                        onLongClick = { removing = first })
+                }
+            }
             if (user != null) {
                 item {
                     SectionTitle(stringResource(R.string.account_my_ao3, user))
@@ -121,27 +136,12 @@ fun HomeScreen(
                     }
                 }
             }
-            if (recent.isEmpty()) {
-                item {
-                    Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.home_empty), textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            } else {
-                val first = recent.first()
-                item {
-                    SectionTitle(stringResource(R.string.home_continue))
-                    ContinueCard(first, onRead = { onRead(first.workId) }, onDetails = { onOpenWork(first.workId) },
-                        onLongClick = { removing = first })
-                }
-                if (recent.size > 1) {
+            if (recent.size > 1) {
                     item { SectionTitle(stringResource(R.string.home_history)) }
                     items(recent.drop(1), key = { it.workId }) { e ->
                         HistoryRow(e, onClick = { onRead(e.workId) }, onLongClick = { removing = e })
                     }
                 }
-            }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }

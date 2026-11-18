@@ -67,13 +67,15 @@ import io.github.cyarrow.ao3reader.ui.common.errorMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(container: AppContainer, onBack: () -> Unit, onOpenWork: (Long) -> Unit) {
+fun SearchScreen(container: AppContainer, onBack: (() -> Unit)?, onOpenWork: (Long) -> Unit) {
     val vm: SearchViewModel = viewModel { SearchViewModel(container) }
     val state by vm.state.collectAsState()
     var text by remember(state.query.query) { mutableStateOf(state.query.query) }
     var showFilters by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
+    // A tag search requested while this tab was kept alive.
+    LaunchedEffect(Unit) { container.pendingSearch?.let { container.pendingSearch = null; vm.search(it) } }
 
     // Load the next page when the end of the list comes into view.
     val nearEnd by remember {
@@ -90,7 +92,7 @@ fun SearchScreen(container: AppContainer, onBack: () -> Unit, onOpenWork: (Long)
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
                 title = {
                     TextField(

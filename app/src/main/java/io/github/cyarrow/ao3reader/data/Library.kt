@@ -36,7 +36,19 @@ data class LibraryEntry(
     val fraction: Float = 0f,
     val lastReadAt: Long = 0,
     val convert: ConvertMode? = null,
-)
+    /** Chapters text of the saved copy, e.g. "22/?". */
+    val savedChapters: String = "",
+    val savedUpdated: String = "",
+    /** Chapters text AO3 reported at the last update check. */
+    val remoteChapters: String = "",
+    val checkedAt: Long = 0,
+    val addedAt: Long = 0,
+) {
+    /** Published chapter count is the number before the slash. */
+    val hasUpdate: Boolean get() = remoteChapters.isNotEmpty() &&
+        (remoteChapters.substringBefore('/').toIntOrNull() ?: 0) > (savedChapters.substringBefore('/').toIntOrNull() ?: chapterCount)
+}
+
 
 /** Cached works on disk plus reading progress for every work that was opened. */
 class Library(context: Context) {
@@ -67,8 +79,11 @@ class Library(context: Context) {
         tmp.writeText(json.encodeToString(Work.serializer(), work))
         tmp.renameTo(File(worksDir, "${work.id}.json"))
         update(work.id) { e ->
-            (e ?: LibraryEntry(work.id, work.title, work.authors, work.chapters.size, work.fandoms))
-                .copy(authors = work.authors, chapterCount = work.chapters.size, fandoms = work.fandoms)
+            (e ?: LibraryEntry(work.id, work.title, work.authors, work.chapters.size, work.fandoms, addedAt = System.currentTimeMillis()))
+                .copy(
+                    authors = work.authors, chapterCount = work.chapters.size, fandoms = work.fandoms,
+                    savedChapters = work.chaptersText, savedUpdated = work.updated, remoteChapters = "",
+                )
         }
     }
 
@@ -96,6 +111,8 @@ class Library(context: Context) {
     fun favoriteFandoms(limit: Int = 8): List<String> =
         _entries.value.values.flatMap { it.fandoms }.groupingBy { it }.eachCount()
             .entries.sortedByDescending { it.value }.take(limit).map { it.key }
+
+    fun savedSizeBytes(id: Long): Long = File(worksDir, "$id.json").length()
 
     fun remove(id: Long) {
         update(id) { null }

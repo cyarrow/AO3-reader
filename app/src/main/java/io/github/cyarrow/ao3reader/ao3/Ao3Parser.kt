@@ -65,6 +65,16 @@ object Ao3Parser {
 
     // ---------------------------------------------------------------- work page
 
+    /** Chapter count ("22/?") and last update date from a work page's stats block. */
+    fun parseWorkStats(html: String): Pair<String, String> {
+        val doc = Jsoup.parse(html, Ao3Client.BASE)
+        checkLoginWall(doc)
+        val stats = doc.selectFirst("dl.stats") ?: throw Ao3Exception.Parse("No stats")
+        val chapters = stats.selectFirst("dd.chapters")?.text()?.trim().orEmpty()
+        val updated = (stats.selectFirst("dd.status") ?: stats.selectFirst("dd.published"))?.text()?.trim().orEmpty()
+        return chapters to updated
+    }
+
     /** Finds the HTML download link on a work page, or throws if the page is a login wall. */
     fun parseDownloadUrl(html: String): String {
         val doc = Jsoup.parse(html, Ao3Client.BASE)

@@ -176,4 +176,16 @@
     <string name="action_later">Later</string>
     <string name="action_failed">Failed: %1$s</string>
     <string name="list_empty">Nothing here yet</string>
+    <string name="tab_reading">Reading</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_shelf">Shelf</string>
+    <string name="shelf_title">Bookshelf</string>
+    <string name="shelf_check">Check for new chapters</string>
+    <string name="shelf_all">All (%1$d)</string>
+    <string name="shelf_updates">New chapters (%1$d)</string>
+    <string name="shelf_offline_note">Every work you open is saved and readable offline. Long-press to remove.</string>
+    <string name="shelf_empty">Your shelf is empty. Works you open are saved here.</string>
+    <string name="shelf_no_updates">No new chapters. Tap ↻ to check.</string>
+    <string name="shelf_new_chapters">New chapters · now %1$s</string>
+    <string name="shelf_update">Update</string>
 </resources>

@@ -36,6 +36,10 @@ class Ao3Client(private val client: OkHttpClient) {
         return Ao3Parser.parseDownload(html, id).copy(fetchedAt = System.currentTimeMillis())
     }
 
+    /** Lightweight check: current chapter count and update date, from the work page only. */
+    suspend fun fetchWorkStats(id: Long): Pair<String, String> =
+        Ao3Parser.parseWorkStats(get("$BASE/works/$id?view_adult=true".toHttpUrl()))
+
     /** AO3's tag autocomplete: type is fandom, relationship, character or freeform. */
     suspend fun autocomplete(type: String, term: String): List<String> {
         if (term.isBlank()) return emptyList()

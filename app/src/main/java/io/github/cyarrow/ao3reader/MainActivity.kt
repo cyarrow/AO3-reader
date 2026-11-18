@@ -17,6 +17,14 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.navigation.navArgument
 import io.github.cyarrow.ao3reader.ao3.parseWorkId
 import io.github.cyarrow.ao3reader.ui.fonts.FontsScreen
@@ -79,7 +87,40 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                NavHost(nav, startDestination = "home") {
+                val backStack by nav.currentBackStackEntryAsState()
+                val route = backStack?.destination?.route
+                val tabs = listOf(
+                    Triple("home", R.string.tab_reading, Icons.AutoMirrored.Filled.MenuBook),
+                    Triple("search", R.string.tab_search, Icons.Filled.Search),
+                    Triple("shelf", R.string.tab_shelf, Icons.AutoMirrored.Filled.LibraryBooks),
+                )
+                androidx.compose.material3.Scaffold(
+                    contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
+                    bottomBar = {
+                        if (route in tabs.map { it.first }) {
+                            androidx.compose.material3.NavigationBar {
+                                tabs.forEach { (r, label, icon) ->
+                                    NavigationBarItem(
+                                        selected = route == r,
+                                        onClick = {
+                                            if (route != r) nav.navigate(r) {
+                                                popUpTo("home") { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                        icon = { androidx.compose.material3.Icon(icon, null) },
+                                        label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(label)) },
+                                    )
+                                }
+                            }
+                        }
+                    },
+                ) { outer ->
+                NavHost(
+                    nav, startDestination = "home",
+                    modifier = androidx.compose.ui.Modifier.padding(outer).consumeWindowInsets(outer),
+                ) {
                     composable("home") {
                         val user by container.account.user.collectAsState()
                         HomeScreen(
@@ -87,19 +128,24 @@ class MainActivity : ComponentActivity() {
                             onOpenList = { nav.navigate("list/${it.name}") },
                             library = container.library,
                             onOpenSettings = { nav.navigate("settings") },
-                            onOpenSearch = { nav.navigate("search") },
+                            onOpenSearch = {
+                                nav.navigate("search") { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true }
+                            },
                             onOpenWork = { nav.navigate("work/$it") },
                             onRead = { nav.navigate("reader/$it") },
                             onSearchFandom = { fandom ->
                                 container.pendingSearch = io.github.cyarrow.ao3reader.ao3.SearchQuery(
                                     fandoms = fandom, sort = io.github.cyarrow.ao3reader.ao3.SearchQuery.Sort.Updated,
                                 )
-                                nav.navigate("search")
+                                nav.navigate("search") { popUpTo("home"); launchSingleTop = true }
                             },
                         )
                     }
                     composable("search") {
-                        SearchScreen(container, onBack = { nav.popBackStack() }, onOpenWork = { nav.navigate("work/$it") })
+                        SearchScreen(container, onBack = null, onOpenWork = { nav.navigate("work/$it") })
+                    }
+                    composable("shelf") {
+                        io.github.cyarrow.ao3reader.ui.shelf.ShelfScreen(container, onRead = { nav.navigate("reader/$it") }, onOpenWork = { nav.navigate("work/$it") })
                     }
                     composable("work/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                         val id = entry.arguments!!.getLong("id")
@@ -110,7 +156,7 @@ class MainActivity : ComponentActivity() {
                             nav.navigate("reader/$id")
                         }, onSearch = { q ->
                             container.pendingSearch = q
-                            nav.navigate("search")
+                            nav.navigate("search") { popUpTo("home"); launchSingleTop = true }
                         })
                     }
                     composable("reader/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
@@ -138,6 +184,8 @@ class MainActivity : ComponentActivity() {
                             onFonts = { nav.navigate("fonts") },
                         )
                     }
+                }
+
                 }
 
                 pendingUpdate?.let { info ->
