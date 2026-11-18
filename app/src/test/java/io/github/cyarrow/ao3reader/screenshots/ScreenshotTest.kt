@@ -116,6 +116,23 @@ class ScreenshotTest {
         compose.onRoot().captureRoboImage(File(out, "home.png").path)
     }
 
+    @Test fun login() {
+        compose.setContent { AO3ReaderTheme { io.github.cyarrow.ao3reader.ui.account.LoginScreen(app.container, {}, {}) } }
+        compose.onRoot().captureRoboImage(File(out, "login.png").path)
+    }
+
+    @Test @Config(qualifiers = "+night") fun homeDark() {
+        app.container.library.saveProgress(1L, 3, 10, 0, 0.18f)
+        compose.setContent { AO3ReaderTheme { HomeScreen(app.container.library, {}, {}, {}, {}) } }
+        compose.onRoot().captureRoboImage(File(out, "home_dark.png").path)
+    }
+
+    @Test @Config(fontScale = 1.3f) fun workDetailLargeFont() {
+        compose.setContent { AO3ReaderTheme { WorkScreen(app.container, 1L, onBack = {}, onRead = {}) } }
+        settle()
+        compose.onRoot().captureRoboImage(File(out, "work_detail_font130.png").path)
+    }
+
     @Test fun workDetail() {
         compose.setContent { AO3ReaderTheme(dynamicColor = false) { WorkScreen(app.container, 1L, onBack = {}, onRead = {}) } }
         settle()

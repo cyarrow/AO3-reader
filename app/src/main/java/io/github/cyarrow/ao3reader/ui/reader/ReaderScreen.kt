@@ -482,22 +482,28 @@ private fun PagedReader(
 /** One-time explanation of the paged-mode tap zones. */
 @Composable
 private fun TapHint(colors: ReaderColors, onDismiss: () -> Unit) {
-    val scrim = if (colors.isDark) Color.Black.copy(alpha = 0.72f) else Color(0xFF1B1916).copy(alpha = 0.62f)
-    Row(
-        Modifier.fillMaxSize().background(scrim).pointerInput(Unit) { detectTapGestures { onDismiss() } },
-    ) {
+    // A near-opaque scrim so the zone labels never compete with the page text.
+    val scrim = Color(0xFF15120F).copy(alpha = 0.88f)
+    Row(Modifier.fillMaxSize().background(scrim).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
         listOf(R.string.reader_tap_hint_left, R.string.reader_tap_hint_center, R.string.reader_tap_hint_right).forEachIndexed { i, label ->
             Box(
                 Modifier.weight(1f).fillMaxSize()
-                    .background(if (i == 1) Color.White.copy(alpha = 0.06f) else Color.Transparent),
+                    .background(if (i == 1) Color.White.copy(alpha = 0.07f) else Color.Transparent),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(label), color = Color.White, fontSize = 16.sp, textAlign = TextAlign.Center)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        when (i) { 0 -> Icons.Filled.ChevronLeft; 1 -> Icons.Filled.TextFields; else -> Icons.Filled.ChevronRight },
+                        null, tint = Color.White, modifier = Modifier.size(32.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(label), color = Color.White, fontSize = 17.sp, textAlign = TextAlign.Center)
+                }
             }
         }
     }
-    Box(Modifier.fillMaxSize().padding(bottom = 64.dp), contentAlignment = Alignment.BottomCenter) {
-        Button(onClick = onDismiss) { Text(stringResource(R.string.reader_tap_hint_ok)) }
+    Box(Modifier.fillMaxSize().padding(bottom = 72.dp), contentAlignment = Alignment.BottomCenter) {
+        Button(onClick = onDismiss, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.reader_tap_hint_ok)) }
     }
 }
 

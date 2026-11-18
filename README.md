@@ -2,7 +2,15 @@
 
 一個用來閱讀 [Archive of Our Own](https://archiveofourown.org) 作品的 Android 閱讀器，以閱讀舒適度為優先（個人使用、側載安裝）。
 
-需求與開發規劃請見 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)。
+需求與開發規劃請見 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)，介面截圖在 [docs/screenshots](docs/screenshots)。
+
+## 功能
+- **閱讀**：上下捲動／左右翻頁、字級、字重、行距、段距、邊距、五種主題、App 內亮度、目錄、章節內進度拖曳、本章剩餘時間、記住閱讀位置、音量鍵翻頁
+- **中文**：簡體自動轉繁（OpenCC，可逐部作品關閉、可選台灣用語）；內建思源宋體，可下載霞鶩文楷、思源黑體、芫荽，或匯入自己的字型
+- **搜尋與瀏覽**：完整篩選、標籤自動完成、點標籤直接搜尋、常看的 Fandom
+- **帳號**：登入、Kudos、書籤、稍後閱讀、閱讀紀錄、鎖定作品
+- **書架**：開啟過的作品自動離線保存、檢查並下載新章節
+- **更新**：App 內自動檢查 GitHub Releases 新版本
 
 ## 安裝與更新
 - 到 [Releases](../../releases) 下載最新的 `ao3reader-x.y.z.apk` 並安裝
