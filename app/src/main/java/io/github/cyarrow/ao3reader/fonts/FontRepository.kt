@@ -19,7 +19,8 @@ import java.io.File
 import java.io.IOException
 import kotlin.coroutines.coroutineContext
 
-data class FontFile(val weight: Int, val fileName: String, val url: String)
+/** A font file; [sha256] pins the exact bytes so a changed or tampered download is rejected. */
+data class FontFile(val weight: Int, val fileName: String, val url: String, val sha256: String = "")
 
 data class FontSpec(
     val id: String,
@@ -34,7 +35,8 @@ data class FontSpec(
     enum class Kind { SystemSans, SystemSerif, Bundled, Download, Custom }
 }
 
-private const val GF = "https://raw.githubusercontent.com/google/fonts/main/ofl"
+// Pinned google/fonts commit: downloads never change underneath us.
+private const val GF = "https://raw.githubusercontent.com/google/fonts/cc5661d43cd4f9aad5567033a8e15ca28dc35c86/ofl"
 
 class FontRepository(private val context: Context, private val client: OkHttpClient) {
     private val dir = File(context.filesDir, "fonts").apply { mkdirs() }
@@ -46,20 +48,20 @@ class FontRepository(private val context: Context, private val client: OkHttpCli
         FontSpec(
             "lxgw_wenkai_tc", "霞鶩文楷", "LXGW WenKai TC．楷書風，溫和易讀", FontSpec.Kind.Download,
             files = listOf(
-                FontFile(300, "LXGWWenKaiTC-Light.ttf", "$GF/lxgwwenkaitc/LXGWWenKaiTC-Light.ttf"),
-                FontFile(400, "LXGWWenKaiTC-Regular.ttf", "$GF/lxgwwenkaitc/LXGWWenKaiTC-Regular.ttf"),
-                FontFile(700, "LXGWWenKaiTC-Bold.ttf", "$GF/lxgwwenkaitc/LXGWWenKaiTC-Bold.ttf"),
+                FontFile(300, "LXGWWenKaiTC-Light.ttf", "$GF/lxgwwenkaitc/LXGWWenKaiTC-Light.ttf", "48cabec60b908f145002192c366d805b674d6e890a98c24f8a39fd33542273fd"),
+                FontFile(400, "LXGWWenKaiTC-Regular.ttf", "$GF/lxgwwenkaitc/LXGWWenKaiTC-Regular.ttf", "4fcc5aec11cbbf737b0cfab7b63796f7f280087a7a656b2f13342cd5e5318d95"),
+                FontFile(700, "LXGWWenKaiTC-Bold.ttf", "$GF/lxgwwenkaitc/LXGWWenKaiTC-Bold.ttf", "5c9feadfd928f3ae3860e7d001ad3d0d0c55b0157fff08cd4d51b51aca677f23"),
             ),
             downloadSizeMb = 39,
         ),
         FontSpec(
             "noto_sans_tc", "思源黑體", "Noto Sans TC．可調粗細", FontSpec.Kind.Download, variable = true,
-            files = listOf(FontFile(400, "NotoSansTC-VF.ttf", "$GF/notosanstc/NotoSansTC%5Bwght%5D.ttf")),
+            files = listOf(FontFile(400, "NotoSansTC-VF.ttf", "$GF/notosanstc/NotoSansTC%5Bwght%5D.ttf", "864727d210d54f2537bbe23b3a839436c3992af72de9322af5270897246bd44f")),
             downloadSizeMb = 12,
         ),
         FontSpec(
             "iansui", "芫荽", "Iansui．圓潤手寫風", FontSpec.Kind.Download,
-            files = listOf(FontFile(400, "Iansui-Regular.ttf", "$GF/iansui/Iansui-Regular.ttf")),
+            files = listOf(FontFile(400, "Iansui-Regular.ttf", "$GF/iansui/Iansui-Regular.ttf", "6e6340d80d618a42b48ade9370c34fa37a8210750c6fbc8efe65f23716538a2b")),
             downloadSizeMb = 9,
         ),
     )
@@ -109,6 +111,15 @@ class FontRepository(private val context: Context, private val client: OkHttpCli
                         }
                     }
                 }
+            }
+            if (file.sha256.isNotEmpty()) {
+                val actual = part.inputStream().use { input ->
+                    val md = java.security.MessageDigest.getInstance("SHA-256")
+                    val buf = ByteArray(64 * 1024)
+                    while (true) { val n = input.read(buf); if (n < 0) break; md.update(buf, 0, n) }
+                    md.digest().joinToString("") { "%02x".format(it) }
+                }
+                if (actual != file.sha256) { part.delete(); throw IOException("Font checksum mismatch") }
             }
             if (!part.renameTo(target)) throw IOException("Cannot save font")
         }

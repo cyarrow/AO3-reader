@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -57,6 +58,9 @@ class Ao3Client(private val client: OkHttpClient) {
     suspend fun fetch(url: String): Page = request(Request.Builder().url(url).build(), allowLogin = true)
 
     suspend fun post(url: String, fields: List<Pair<String, String>>, referer: String? = null): Page {
+        // Credentials and session-bound forms may only ever be submitted to AO3 itself over HTTPS,
+        // whatever action URL a parsed form claims.
+        require(isAo3(url)) { "Refusing to submit a form outside AO3" }
         val body = okhttp3.FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build()
         val req = Request.Builder().url(url).post(body).apply { if (referer != null) header("Referer", referer) }.build()
         return request(req, allowLogin = true)
@@ -83,6 +87,12 @@ class Ao3Client(private val client: OkHttpClient) {
             lastRequestAt = System.currentTimeMillis()
         }
     }
+}
+
+/** True for https URLs on archiveofourown.org (or its www host). */
+fun isAo3(url: String): Boolean {
+    val u = url.toHttpUrlOrNull() ?: return false
+    return u.isHttps && (u.host == "archiveofourown.org" || u.host == "www.archiveofourown.org")
 }
 
 /** Extracts a work id from a pasted AO3 link or a bare number. */

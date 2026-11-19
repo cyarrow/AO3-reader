@@ -27,3 +27,14 @@ class SearchQueryTest {
         assertFalse(SearchQuery(fandoms = "F").isBrowse)
     }
 }
+
+class Ao3HostTest {
+    @Test fun onlyAo3OverHttps() {
+        assertTrue(isAo3("https://archiveofourown.org/users/login"))
+        assertTrue(isAo3("https://www.archiveofourown.org/kudos"))
+        assertFalse(isAo3("http://archiveofourown.org/users/login"))
+        assertFalse(isAo3("https://archiveofourown.org.evil.example/users/login"))
+        assertFalse(isAo3("https://evil.example/archiveofourown.org"))
+        assertFalse(isAo3(""))
+    }
+}
