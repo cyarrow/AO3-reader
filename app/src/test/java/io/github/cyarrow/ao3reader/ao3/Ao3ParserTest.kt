@@ -70,6 +70,33 @@ class Ao3ParserTest {
         assertFalse(page.works[1].complete)
     }
 
+    @Test fun parsesWorkPagePreview() {
+        val html = fixture("work_page.html")
+        val w = Ao3Parser.parseWorkPage(html, 123)
+        assertTrue(w.partial)
+        assertEquals("测试作品", w.title)
+        assertEquals(listOf("tester"), w.authors)
+        assertEquals("Explicit", w.rating)
+        assertEquals(listOf("A/B"), w.relationships)
+        assertEquals("3/?", w.chaptersText)
+        assertEquals("2025-11-15", w.updated)
+        assertEquals(listOf("简介"), w.summary.map { it.text })
+        assertEquals(listOf("Chapter 1: 开端", "Chapter 2", "Chapter 3: 番外: 结局"), w.chapters.map { it.title })
+        assertEquals(listOf("第一段。", "第二段。"), w.chapters[0].body.map { it.text })
+        assertEquals(listOf("备注"), w.chapters[0].notes.map { it.text })
+        assertTrue(w.chapters[1].body.isEmpty())
+        assertEquals("https://archiveofourown.org/downloads/123/x.html?updated_at=1", Ao3Parser.parseDownloadUrl(html))
+    }
+
+    @Test fun parsesSingleChapterWorkPage() {
+        val html = """<div id="workskin"><div class="preface group"><h2 class="title heading">One</h2></div>
+            <div id="chapters" role="article"><h3 class="landmark heading">Work Text:</h3>
+            <div class="userstuff"><p>Only.</p></div></div></div>"""
+        val w = Ao3Parser.parseWorkPage(html, 1)
+        assertEquals(1, w.chapters.size)
+        assertEquals(listOf("Only."), w.chapters[0].body.map { it.text })
+    }
+
     @Test fun parsesAutocomplete() {
         assertEquals(listOf("ENHYPEN (Band)", "Harry Potter - J. K. Rowling"),
             Ao3Parser.parseAutocomplete("""[{"id":"ENHYPEN (Band)","name":"ENHYPEN (Band)"},{"id":"x","name":"Harry Potter - J. K. Rowling"}]"""))

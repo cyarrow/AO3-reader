@@ -65,6 +65,72 @@ object Ao3Parser {
 
     // ---------------------------------------------------------------- work page
 
+    /**
+     * Parses a regular work page into a partial [Work]: full metadata and chapter titles, but only the
+     * chapter AO3 rendered on that page has its text. Used to start reading before the full download.
+     */
+    fun parseWorkPage(html: String, workId: Long): Work {
+        val doc = Jsoup.parse(html, Ao3Client.BASE)
+        checkLoginWall(doc)
+        val workskin = doc.selectFirst("#workskin") ?: throw Ao3Exception.Parse("No workskin")
+        val meta = doc.selectFirst("dl.work.meta")
+        fun tags(cls: String) = meta?.select("dd.$cls a.tag")?.map { it.text().trim() }.orEmpty()
+        fun stat(cls: String) = meta?.selectFirst("dl.stats dd.$cls")?.text()?.trim().orEmpty()
+        val preface = workskin.selectFirst("div.preface.group")
+        fun quote(root: Element?, selector: String) =
+            root?.selectFirst(selector)?.let { HtmlBlocks.convert(it) }.orEmpty()
+
+        // Chapter titles: the chapter dropdown lists them all as "1. Title".
+        val optionPattern = Regex("^\\s*(\\d+)\\.\\s*(.*)$")
+        val options = doc.select("select#selected_id option")
+        val titles = options.map { opt ->
+            val m = optionPattern.find(opt.text())
+            if (m == null) opt.text().trim() else {
+                val n = m.groupValues[1]
+                val t = m.groupValues[2].trim()
+                if (t.isEmpty() || t.equals("Chapter $n", ignoreCase = true)) "Chapter $n" else "Chapter $n: $t"
+            }
+        }
+        val currentIndex = options.indexOfFirst { it.hasAttr("selected") }.coerceAtLeast(0)
+
+        val chaptersRoot = workskin.selectFirst("#chapters") ?: throw Ao3Exception.Parse("No chapters")
+        val chapterDiv = chaptersRoot.selectFirst("div.chapter")
+        val bodyRoot = chapterDiv?.selectFirst("div.userstuff[role=article], div.userstuff.module")
+            ?: chaptersRoot.selectFirst("div.userstuff")
+            ?: throw Ao3Exception.Parse("No chapter text")
+        val body = HtmlBlocks.convert(bodyRoot)
+        val shownTitle = chapterDiv?.selectFirst("h3.title")?.text()?.trim()
+        val chapterSummary = quote(chapterDiv, "div.summary.module blockquote.userstuff")
+        val chapterNotes = quote(chapterDiv, "div.chapter.preface div.notes.module blockquote.userstuff")
+
+        val count = maxOf(titles.size, 1)
+        val chapters = (0 until count).map { i ->
+            val title = titles.getOrNull(i) ?: shownTitle.orEmpty()
+            if (i == currentIndex) Chapter(i, shownTitle ?: title, summary = chapterSummary, notes = chapterNotes, body = body)
+            else Chapter(i, title, body = emptyList())
+        }
+        return Work(
+            id = workId,
+            title = preface?.selectFirst("h2.title")?.text()?.trim().orEmpty(),
+            authors = preface?.select("h3.byline a[rel=author]")?.map { it.text().trim() }.orEmpty(),
+            fandoms = tags("fandom"),
+            rating = tags("rating").firstOrNull().orEmpty(),
+            warnings = tags("warning"),
+            relationships = tags("relationship"),
+            characters = tags("character"),
+            freeforms = tags("freeform"),
+            language = meta?.selectFirst("dd.language")?.text()?.trim().orEmpty(),
+            words = stat("words").filter { it.isDigit() }.toIntOrNull() ?: 0,
+            chaptersText = stat("chapters"),
+            published = stat("published"),
+            updated = stat("status").ifEmpty { stat("published") },
+            summary = quote(preface, "div.summary.module blockquote.userstuff"),
+            notes = quote(preface, "div.notes.module blockquote.userstuff"),
+            chapters = chapters,
+            partial = true,
+        )
+    }
+
     /** Chapter count ("22/?") and last update date from a work page's stats block. */
     fun parseWorkStats(html: String): Pair<String, String> {
         val doc = Jsoup.parse(html, Ao3Client.BASE)

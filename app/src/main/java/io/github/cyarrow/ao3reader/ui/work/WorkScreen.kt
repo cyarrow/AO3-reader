@@ -88,8 +88,7 @@ class WorkViewModel(private val container: AppContainer, private val id: Long) :
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val work = container.library.cachedWork(id)
-                    ?: container.ao3.fetchWork(id).also { container.library.saveWork(it) }
+                val work = container.works.load(id)
                 val shown = convert(work)
                 container.library.update(id) { it?.copy(title = shown.title) }
                 _state.update { it.copy(work = shown, raw = work, loading = false) }

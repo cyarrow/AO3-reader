@@ -26,6 +26,7 @@ data class DisplayLabels(
     val workNotes: String,
     val workEndNotes: String,
     val chapterNumber: (Int) -> String = { "Chapter $it" },
+    val downloading: String = "Downloading…",
 )
 
 fun Block.toAnnotated(): AnnotatedString = buildAnnotatedString {
@@ -68,6 +69,9 @@ fun buildDisplay(work: Work, showNotes: Boolean, labels: DisplayLabels): List<Di
         section(labels.summary, ch.summary)
         section(labels.notes, ch.notes)
         if (blocks.size > 1) blocks += DisplayBlock(DisplayBlock.Type.Divider, AnnotatedString(""))
+        if (ch.body.isEmpty() && work.partial) {
+            blocks += DisplayBlock(DisplayBlock.Type.Meta, AnnotatedString(labels.downloading), center = true)
+        }
         ch.body.forEach { blocks += it.toDisplay(meta = false) }
         section(labels.endNotes, ch.endNotes)
         if (i == work.chapters.lastIndex) section(labels.workEndNotes, work.endNotes)

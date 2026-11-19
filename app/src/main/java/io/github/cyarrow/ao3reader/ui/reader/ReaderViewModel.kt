@@ -21,6 +21,8 @@ sealed interface ReaderState {
     data class Failed(val error: Throwable) : ReaderState
     data class Ready(
         val work: Work,
+        /** Only the first chapter is available yet; the rest is still downloading. */
+        val partial: Boolean,
         val simplifiedSource: Boolean,
         val converted: Boolean,
         val workConvert: ConvertMode?,
@@ -42,16 +44,29 @@ class ReaderViewModel(private val container: AppContainer, private val workId: L
     init { load() }
 
     fun load(forceRefresh: Boolean = false) {
-        _state.value = ReaderState.Loading
+        if (!forceRefresh || raw == null) _state.value = ReaderState.Loading
+        // Start reading from the first-chapter preview while the full work downloads.
+        val startsAtBeginning = (initialEntry?.chapterIndex ?: 0) == 0
+        val previewJob = if (startsAtBeginning && raw == null) viewModelScope.launch {
+            container.works.previews.collect { previews ->
+                val preview = previews[workId]
+                if (preview != null && raw == null) {
+                    raw = preview
+                    applyConversion()
+                }
+            }
+        } else null
         viewModelScope.launch {
             try {
-                val work = (if (forceRefresh) null else container.library.cachedWork(workId))
-                    ?: container.ao3.fetchWork(workId).also { container.library.saveWork(it) }
+                val work = container.works.load(workId, refresh = forceRefresh)
+                previewJob?.cancel()
                 raw = work
-                if (container.library.entry(workId) == null) container.library.saveWork(work)
                 applyConversion()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _state.value = ReaderState.Failed(e)
+                previewJob?.cancel()
+                if (raw == null || raw?.partial == true) _state.value = ReaderState.Failed(e)
             }
         }
     }
@@ -72,9 +87,11 @@ class ReaderViewModel(private val container: AppContainer, private val workId: L
             val shown = if (shouldConvert) {
                 withContext(Dispatchers.Default) { WorkConversion(converter, settings.taiwanPhrases).work(work) }
             } else work
-            _state.value = ReaderState.Ready(shown, simplified, shouldConvert, workMode, ++version)
+            // A late preview must never replace the full work.
+            if (work.partial && raw?.partial == false) return@launch
+            _state.value = ReaderState.Ready(shown, work.partial, simplified, shouldConvert, workMode, ++version)
             // Keep the library in the script the reader sees.
-            container.library.update(workId) { it?.copy(title = shown.title) }
+            if (!work.partial) container.library.update(workId) { it?.copy(title = shown.title) }
         }
     }
 

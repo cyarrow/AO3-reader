@@ -158,6 +158,7 @@ private fun ReaderBody(
         workNotes = stringResource(R.string.reader_work_notes),
         workEndNotes = stringResource(R.string.reader_work_end_notes),
         chapterNumber = chapterFormat(),
+        downloading = stringResource(R.string.reader_downloading_rest),
     )
     val chapters = remember(st.version, s.showNotes) { buildDisplay(st.work, s.showNotes, labels) }
     val installed by container.fonts.installed.collectAsState()

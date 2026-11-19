@@ -92,7 +92,7 @@ fun ShelfScreen(container: AppContainer, onRead: (Long) -> Unit, onOpenWork: (Lo
         busy[e.workId] = true
         scope.launch {
             try {
-                library.saveWork(container.ao3.fetchWork(e.workId))
+                container.works.load(e.workId, refresh = true)
             } catch (ex: kotlinx.coroutines.CancellationException) {
                 throw ex
             } catch (ex: Exception) {

@@ -186,4 +186,5 @@
     <string name="shelf_no_updates">沒有新章節。點右上角 ↻ 檢查。</string>
     <string name="shelf_new_chapters">有新章節 · 目前 %1$s</string>
     <string name="shelf_update">更新</string>
+    <string name="reader_downloading_rest">正在下載其餘章節…</string>
 </resources>

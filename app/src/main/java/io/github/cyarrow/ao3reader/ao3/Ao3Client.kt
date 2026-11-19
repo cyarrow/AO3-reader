@@ -17,7 +17,8 @@ import okhttp3.Request
 class Ao3Client(private val client: OkHttpClient) {
     companion object {
         const val BASE = "https://archiveofourown.org"
-        private const val MIN_INTERVAL_MS = 1500L
+        /** Spacing between requests: polite to AO3 without making the reader wait. */
+        private const val MIN_INTERVAL_MS = 400L
     }
 
     private val mutex = Mutex()
@@ -29,9 +30,11 @@ class Ao3Client(private val client: OkHttpClient) {
     }
 
     /** Fetches a complete work (all chapters) through AO3's HTML download. */
-    suspend fun fetchWork(id: Long): Work {
+    suspend fun fetchWork(id: Long, onPreview: (suspend (Work) -> Unit)? = null): Work {
         val workPage = get("$BASE/works/$id?view_adult=true".toHttpUrl())
         val downloadUrl = Ao3Parser.parseDownloadUrl(workPage)
+        // The work page already contains the first chapter: hand it over while the full text downloads.
+        if (onPreview != null) runCatching { Ao3Parser.parseWorkPage(workPage, id) }.getOrNull()?.let { onPreview(it) }
         val html = get(downloadUrl.toHttpUrl())
         return Ao3Parser.parseDownload(html, id).copy(fetchedAt = System.currentTimeMillis())
     }

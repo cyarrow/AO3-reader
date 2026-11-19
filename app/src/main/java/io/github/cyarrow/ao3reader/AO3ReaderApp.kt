@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -24,6 +25,8 @@ class AO3ReaderApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Load the Simplified/Traditional dictionaries in the background so opening a work never waits on them.
+        kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch { runCatching { container.converter() } }
     }
 }
 
@@ -53,6 +56,7 @@ class AppContainer(private val app: Application) {
         ao3, cookieJar, io.github.cyarrow.ao3reader.account.SecureStore(app, "account"),
     )
     val library = Library(app)
+    val works = io.github.cyarrow.ao3reader.data.WorkRepository(ao3, library)
     val readerPrefs = ReaderPreferences(app)
     val fonts = FontRepository(app, httpClient)
 

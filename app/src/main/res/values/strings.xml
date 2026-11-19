@@ -188,4 +188,5 @@
     <string name="shelf_no_updates">No new chapters. Tap ↻ to check.</string>
     <string name="shelf_new_chapters">New chapters · now %1$s</string>
     <string name="shelf_update">Update</string>
+    <string name="reader_downloading_rest">Downloading the rest of this work…</string>
 </resources>

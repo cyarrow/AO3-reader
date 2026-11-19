@@ -84,6 +84,8 @@ data class Work(
     val endNotes: List<Block> = emptyList(),
     val chapters: List<Chapter>,
     val fetchedAt: Long = 0,
+    /** True for a quick preview where only one chapter has text; never saved to disk. */
+    @kotlinx.serialization.Transient val partial: Boolean = false,
 )
 
 sealed class Ao3Exception(message: String) : Exception(message) {
