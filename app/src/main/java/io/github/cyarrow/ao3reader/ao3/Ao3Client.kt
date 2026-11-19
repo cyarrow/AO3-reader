@@ -24,8 +24,8 @@ class Ao3Client(private val client: OkHttpClient) {
     private val mutex = Mutex()
     private var lastRequestAt = 0L
 
-    suspend fun search(query: SearchQuery, page: Int): SearchPage {
-        val html = get(query.toUrl(page))
+    suspend fun search(query: SearchQuery, page: Int, keywordVariants: List<String> = emptyList()): SearchPage {
+        val html = get(query.toUrl(page, keywordVariants))
         return Ao3Parser.parseWorkList(html, page)
     }
 

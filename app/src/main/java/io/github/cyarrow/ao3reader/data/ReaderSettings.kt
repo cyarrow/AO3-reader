@@ -68,4 +68,24 @@ class ReaderPreferences(private val context: Context) {
     suspend fun saveSearch(query: SearchQuery) {
         context.readerStore.edit { it[searchKey] = json.encodeToString(SearchQuery.serializer(), query) }
     }
+
+    private val recentKey = stringPreferencesKey("recent_searches")
+
+    /** Most recent distinct searches, newest first (filters and sort are kept). */
+    val recentSearches: Flow<List<SearchQuery>> = context.readerStore.data.map { prefs ->
+        prefs[recentKey]?.let { runCatching { json.decodeFromString<List<SearchQuery>>(it) }.getOrNull() } ?: emptyList()
+    }
+
+    suspend fun addRecentSearch(query: SearchQuery) {
+        if (query.isBrowse) return
+        context.readerStore.edit { prefs ->
+            val current = prefs[recentKey]?.let { runCatching { json.decodeFromString<List<SearchQuery>>(it) }.getOrNull() } ?: emptyList()
+            val next = (listOf(query) + current.filter { it != query }).take(10)
+            prefs[recentKey] = json.encodeToString(next)
+        }
+    }
+
+    suspend fun clearRecentSearches() {
+        context.readerStore.edit { it.remove(recentKey) }
+    }
 }

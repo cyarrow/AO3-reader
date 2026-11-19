@@ -116,6 +116,36 @@ class ScreenshotTest {
         compose.onRoot().captureRoboImage(File(out, "home.png").path)
     }
 
+    @Test fun searchStart() {
+        compose.setContent { AO3ReaderTheme { io.github.cyarrow.ao3reader.ui.search.SearchScreen(app.container, null) {} } }
+        settle()
+        compose.onRoot().captureRoboImage(File(out, "search_start.png").path)
+    }
+
+    @Test fun searchSuggestions() {
+        compose.setContent {
+            AO3ReaderTheme {
+                androidx.compose.foundation.layout.Column {
+                    io.github.cyarrow.ao3reader.ui.search.ActiveFilters(
+                        io.github.cyarrow.ao3reader.ao3.SearchQuery(query = "結構", relationships = "Lee Heeseung/Sim Jaeyun | Jake"),
+                        "1 - 20 of 312 Works", {}, {},
+                    )
+                    io.github.cyarrow.ao3reader.ui.search.SuggestionList(
+                        "heejake",
+                        io.github.cyarrow.ao3reader.ui.search.Suggestions(
+                            "heejake",
+                            fandoms = listOf("ENHYPEN (Band)"),
+                            relationships = listOf("Lee Heeseung/Sim Jaeyun | Jake", "Heejake - Relationship"),
+                            characters = listOf("Sim Jaeyun | Jake"),
+                        ),
+                        {}, { _, _ -> },
+                    )
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage(File(out, "search_suggestions.png").path)
+    }
+
     @Test fun login() {
         compose.setContent { AO3ReaderTheme { io.github.cyarrow.ao3reader.ui.account.LoginScreen(app.container, {}, {}) } }
         compose.onRoot().captureRoboImage(File(out, "login.png").path)

@@ -189,4 +189,25 @@
     <string name="shelf_new_chapters">New chapters · now %1$s</string>
     <string name="shelf_update">Update</string>
     <string name="reader_downloading_rest">Downloading the rest of this work…</string>
+    <string name="search_placeholder">Title, ship, character, fandom…</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_tips">Type anything: a work title, a ship like "Harry/Draco", a character or a fandom. Pick a suggestion to search that tag exactly. Traditional and Simplified Chinese both match.</string>
+    <string name="search_recent">Recent searches</string>
+    <string name="search_clear_recent">Clear</string>
+    <string name="search_browse">Browse</string>
+    <string name="search_browse_latest">Latest updates</string>
+    <string name="search_browse_latest_desc">Works updated most recently</string>
+    <string name="search_browse_kudos">Most kudos</string>
+    <string name="search_browse_kudos_desc">The most loved works</string>
+    <string name="search_browse_complete">Completed favorites</string>
+    <string name="search_browse_complete_desc">Finished works, by kudos</string>
+    <string name="search_keyword">Search "%1$s"</string>
+    <string name="search_keyword_desc">Matches titles, summaries, tags and text</string>
+    <string name="search_group_fandom">Fandoms</string>
+    <string name="search_group_relationship">Ships</string>
+    <string name="search_group_character">Characters</string>
+    <string name="search_finding_tags">Looking for matching tags…</string>
+    <string name="search_no_tags">No matching tags. You can still search the keyword.</string>
+    <string name="search_remove_filter">Remove</string>
+    <string name="search_more_filters">More filters</string>
 </resources>

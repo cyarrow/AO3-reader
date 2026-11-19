@@ -9,6 +9,7 @@ import io.github.cyarrow.ao3reader.data.ConvertMode
 import io.github.cyarrow.ao3reader.reader.WorkConversion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,28 +26,82 @@ data class SearchUiState(
     val total: String? = null,
     val loading: Boolean = false,
     val error: Throwable? = null,
+    /** False while showing the start page (no search run yet). */
     val searched: Boolean = false,
 )
+
+/** Tag suggestions for what is being typed, grouped by AO3 tag type. */
+data class Suggestions(
+    val term: String = "",
+    val fandoms: List<String> = emptyList(),
+    val relationships: List<String> = emptyList(),
+    val characters: List<String> = emptyList(),
+    val loading: Boolean = false,
+) {
+    val isEmpty get() = fandoms.isEmpty() && relationships.isEmpty() && characters.isEmpty()
+}
 
 class SearchViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
+
+    private val _suggestions = MutableStateFlow(Suggestions())
+    val suggestions: StateFlow<Suggestions> = _suggestions.asStateFlow()
+
+    val recent = container.readerPrefs.recentSearches
+
     private var job: Job? = null
+    private var suggestJob: Job? = null
 
     init {
         viewModelScope.launch {
-            val pending = container.pendingSearch?.also { container.pendingSearch = null }
-            val start = pending ?: container.readerPrefs.lastSearch.first()
-            _state.update { it.copy(query = start) }
-            search(start)
+            // Remember the last language/sort/rating choices, but start on the start page.
+            val last = container.readerPrefs.lastSearch.first()
+            _state.update { it.copy(query = SearchQuery(language = last.language, sort = last.sort, ratings = last.ratings)) }
+            container.pendingSearch?.let { container.pendingSearch = null; search(it) }
         }
     }
 
     fun search(query: SearchQuery) {
         job?.cancel()
+        suggestJob?.cancel()
+        _suggestions.value = Suggestions()
         _state.value = SearchUiState(query = query, loading = true, searched = true)
-        viewModelScope.launch { container.readerPrefs.saveSearch(query) }
+        viewModelScope.launch {
+            container.readerPrefs.saveSearch(query)
+            container.readerPrefs.addRecentSearch(query)
+        }
         job = viewModelScope.launch { load(1) }
+    }
+
+    /** Back to the start page, keeping language and sort preferences. */
+    fun clear() {
+        job?.cancel()
+        val q = _state.value.query
+        _state.value = SearchUiState(query = SearchQuery(language = q.language, sort = q.sort, ratings = q.ratings))
+    }
+
+    fun clearRecent() = viewModelScope.launch { container.readerPrefs.clearRecentSearches() }
+
+    /** Fetches fandom / relationship / character suggestions for [text], debounced. */
+    fun suggest(text: String) {
+        suggestJob?.cancel()
+        val term = text.trim()
+        if (term.length < 2) { _suggestions.value = Suggestions(term); return }
+        _suggestions.value = Suggestions(term, loading = true)
+        suggestJob = viewModelScope.launch {
+            delay(450)
+            val variants = container.converter().variants(term).take(2)
+            suspend fun fetch(type: String) = variants.flatMap { v ->
+                runCatching { container.ao3.autocomplete(type, v) }.getOrDefault(emptyList())
+            }.distinct().take(4)
+            val fandoms = fetch("fandom")
+            _suggestions.value = Suggestions(term, fandoms = fandoms, loading = true)
+            val relationships = fetch("relationship")
+            _suggestions.value = _suggestions.value.copy(relationships = relationships)
+            val characters = fetch("character")
+            _suggestions.value = _suggestions.value.copy(characters = characters, loading = false)
+        }
     }
 
     fun loadMore() {
@@ -62,12 +117,14 @@ class SearchViewModel(private val container: AppContainer) : ViewModel() {
         job = viewModelScope.launch { load(s.page + 1) }
     }
 
-    suspend fun suggest(type: String, term: String): List<String> =
+    suspend fun suggestFor(type: String, term: String): List<String> =
         runCatching { container.ao3.autocomplete(type, term) }.getOrDefault(emptyList())
 
     private suspend fun load(page: Int) {
         try {
-            val result = container.ao3.search(_state.value.query, page)
+            val q = _state.value.query
+            val variants = if (q.query.isNotBlank()) container.converter().variants(q.query.trim()) else emptyList()
+            val result = container.ao3.search(q, page, variants)
             result.works.forEach { container.summaries[it.id] = it }
             val shown = convertIfNeeded(result.works)
             _state.update {
