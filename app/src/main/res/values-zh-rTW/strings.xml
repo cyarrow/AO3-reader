@@ -216,4 +216,22 @@
     <string name="reader_work_done">作品讀完了</string>
     <string name="reader_work_done_desc">標記為已讀完（100%）</string>
     <string name="reader_work_finished">✓ 已讀完這部作品</string>
+    <string name="shelf_tab_reading">閱讀中</string>
+    <string name="shelf_tab_to_read">想讀</string>
+    <string name="shelf_tab_finished">已讀完</string>
+    <string name="shelf_tab_updates">有更新</string>
+    <string name="shelf_sort">排序</string>
+    <string name="shelf_sort_last_read">最近閱讀</string>
+    <string name="shelf_sort_added">最近加入</string>
+    <string name="shelf_sort_title">標題</string>
+    <string name="shelf_sort_progress">進度</string>
+    <string name="shelf_search_hint">搜尋標題、作者、Fandom、CP</string>
+    <string name="shelf_no_match">書架裡沒有符合的作品</string>
+    <string name="shelf_empty_reading">正在讀的作品會出現在這裡。</string>
+    <string name="shelf_empty_to_read">打開過、還沒開始讀的作品會出現在這裡。</string>
+    <string name="shelf_empty_finished">讀完的作品會出現在這裡。</string>
+    <string name="shelf_selected">已選 %1$d 部</string>
+    <string name="shelf_select_all">全選</string>
+    <string name="shelf_remove_title">移除 %1$d 部作品？</string>
+    <string name="shelf_remove_desc">會從這台裝置移除，閱讀進度也會一併刪除；不影響你的 AO3 帳號。</string>
 </resources>

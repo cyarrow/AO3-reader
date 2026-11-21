@@ -28,6 +28,7 @@ data class LibraryEntry(
     val authors: List<String>,
     val chapterCount: Int,
     val fandoms: List<String> = emptyList(),
+    val relationships: List<String> = emptyList(),
     val chapterIndex: Int = 0,
     /** Index into the chapter's display blocks, and character offset inside that block. */
     val blockIndex: Int = 0,
@@ -86,6 +87,7 @@ class Library(context: Context) {
             (e ?: LibraryEntry(work.id, work.title, work.authors, work.chapters.size, work.fandoms, addedAt = System.currentTimeMillis()))
                 .copy(
                     authors = work.authors, chapterCount = work.chapters.size, fandoms = work.fandoms,
+                    relationships = work.relationships,
                     savedChapters = work.chaptersText, savedUpdated = work.updated, remoteChapters = "",
                 )
         }
@@ -122,9 +124,12 @@ class Library(context: Context) {
 
     fun savedSizeBytes(id: Long): Long = File(worksDir, "$id.json").length()
 
-    fun remove(id: Long) {
-        update(id) { null }
-        scope.launch { File(worksDir, "$id.json").delete() }
+    fun remove(id: Long) = removeAll(listOf(id))
+
+    fun removeAll(ids: Collection<Long>) {
+        _entries.update { it - ids.toSet() }
+        persist()
+        scope.launch { ids.forEach { File(worksDir, "$it.json").delete() } }
     }
 
     private fun persist() {

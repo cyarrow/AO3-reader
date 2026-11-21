@@ -218,4 +218,22 @@
     <string name="reader_work_done">Finished this work</string>
     <string name="reader_work_done_desc">Marks it as 100% read</string>
     <string name="reader_work_finished">✓ You finished this work</string>
+    <string name="shelf_tab_reading">Reading</string>
+    <string name="shelf_tab_to_read">Not started</string>
+    <string name="shelf_tab_finished">Finished</string>
+    <string name="shelf_tab_updates">Updates</string>
+    <string name="shelf_sort">Sort</string>
+    <string name="shelf_sort_last_read">Recently read</string>
+    <string name="shelf_sort_added">Recently added</string>
+    <string name="shelf_sort_title">Title</string>
+    <string name="shelf_sort_progress">Progress</string>
+    <string name="shelf_search_hint">Search title, author, fandom, ship</string>
+    <string name="shelf_no_match">No saved works match</string>
+    <string name="shelf_empty_reading">Works you are reading show up here.</string>
+    <string name="shelf_empty_to_read">Works you opened but have not started show up here.</string>
+    <string name="shelf_empty_finished">Works you finish show up here.</string>
+    <string name="shelf_selected">%1$d selected</string>
+    <string name="shelf_select_all">Select all</string>
+    <string name="shelf_remove_title">Remove %1$d works?</string>
+    <string name="shelf_remove_desc">They are removed from this device together with reading progress. Your AO3 account is not affected.</string>
 </resources>
