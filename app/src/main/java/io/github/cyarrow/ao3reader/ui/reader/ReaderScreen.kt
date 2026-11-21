@@ -196,6 +196,12 @@ private fun ReaderBody(
     var navCounter by remember { mutableIntStateOf(0) }
     VolumeKeys(s.volumeKeys) { forward -> navRequest = if (forward) 1 else -1; navCounter++ }
 
+    val entries by container.library.entries.collectAsState()
+    val finished = entries[st.work.id]?.finished == true
+    val finishWork = {
+        position = position.copy(atEnd = true)
+        container.library.markFinished(st.work.id, true)
+    }
     val toggleChrome = { chromeVisible = !chromeVisible }
     val jumpToChapter = { index: Int -> position = Position(index.coerceIn(0, chapters.lastIndex), 0, 0) }
 
@@ -206,12 +212,14 @@ private fun ReaderBody(
                 onPosition = { position = it },
                 onTap = toggleChrome,
                 navRequest = navRequest, navCounter = navCounter,
+                finished = finished, onNextChapter = { jumpToChapter(it) }, onFinishWork = finishWork,
             )
             ReadingMode.Paged -> PagedReader(
                 chapters, styles, colors, s, position,
                 onPosition = { position = it },
                 onTap = toggleChrome,
                 navRequest = navRequest, navCounter = navCounter,
+                finished = finished, onNextChapter = { jumpToChapter(it) }, onFinishWork = finishWork,
             )
         }
 
@@ -221,7 +229,7 @@ private fun ReaderBody(
             title = st.work.title,
             chapterTitle = chapters.getOrNull(position.chapter)?.title.orEmpty(),
             chapterLabel = stringResource(R.string.reader_chapter_of, position.chapter + 1, chapters.size),
-            percent = (fraction(chapters, position) * 100).toInt(),
+            percent = if (finished) 100 else (fraction(chapters, position) * 100).toInt(),
             minutesLeft = minutesLeftInChapter(chapters, position),
             blockCount = chapters.getOrNull(position.chapter)?.blocks?.size ?: 1,
             block = position.block.coerceAtMost((chapters.getOrNull(position.chapter)?.blocks?.size ?: 1) - 1),
@@ -287,11 +295,14 @@ private fun ScrollReader(
     onTap: () -> Unit,
     navRequest: Int,
     navCounter: Int,
+    finished: Boolean,
+    onNextChapter: (Int) -> Unit,
+    onFinishWork: () -> Unit,
 ) {
-    // Flatten every chapter into one list for continuous scrolling.
-    val offsets = remember(chapters) { chapters.runningFold(0) { acc, c -> acc + c.blocks.size } }
-    val items = remember(chapters) { chapters.flatMap { c -> c.blocks.indices.map { c.index to it } } }
-    fun globalIndex(p: Position) = (offsets.getOrElse(p.chapter) { 0 } + p.block).coerceIn(0, (items.size - 1).coerceAtLeast(0))
+    // Flatten every chapter into one list for continuous scrolling; block index -1 is the chapter's end actions.
+    val offsets = remember(chapters) { chapters.runningFold(0) { acc, c -> acc + c.blocks.size + 1 } }
+    val items = remember(chapters) { chapters.flatMap { c -> c.blocks.indices.map { c.index to it } + (c.index to -1) } }
+    fun globalIndex(p: Position) = (offsets.getOrElse(p.chapter) { 0 } + p.block.coerceAtLeast(0)).coerceIn(0, (items.size - 1).coerceAtLeast(0))
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = globalIndex(position))
     var lastReported by remember { mutableStateOf(position) }
@@ -304,7 +315,8 @@ private fun ScrollReader(
     }
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex to !listState.canScrollForward }.collect { (idx, bottom) ->
-            val (ch, block) = items.getOrNull(idx) ?: return@collect
+            val (ch, rawBlock) = items.getOrNull(idx) ?: return@collect
+            val block = if (rawBlock < 0) (chapters[ch].blocks.size - 1).coerceAtLeast(0) else rawBlock
             // The list holds the whole work, so hitting the bottom means the work is finished.
             val p = Position(ch, block, 0, atEnd = bottom && items.isNotEmpty())
             lastReported = p
@@ -329,6 +341,14 @@ private fun ScrollReader(
                 contentPadding = PaddingValues(start = margin, end = margin, top = 40.dp, bottom = 96.dp),
             ) {
                 itemsIndexed(items, key = { _, it -> "${it.first}-${it.second}" }) { i, (ch, block) ->
+                    if (block < 0) {
+                        ChapterEndActions(
+                            isLast = ch == chapters.lastIndex, finished = finished,
+                            nextTitle = chapters.getOrNull(ch + 1)?.title, colors = colors,
+                            onNextChapter = { onNextChapter(ch + 1) }, onFinishWork = onFinishWork,
+                        )
+                        return@itemsIndexed
+                    }
                     val b = chapters[ch].blocks[block]
                     // Breathing room before every chapter opening after the first.
                     if (i > 0 && block == 0) Spacer(Modifier.height((s.fontSize * 4).dp))
@@ -347,7 +367,8 @@ private fun ScrollReader(
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(12.dp))
-            Text("${(fraction(chapters, position) * 100).toInt()}%", color = colors.secondary, fontSize = 11.sp)
+            Text(if (finished) stringResource(R.string.progress_finished) else "${(fraction(chapters, position) * 100).toInt()}%",
+                color = colors.secondary, fontSize = 11.sp)
             Spacer(Modifier.width(12.dp))
             Clock(colors, 11)
         }
@@ -367,6 +388,9 @@ private fun PagedReader(
     onTap: () -> Unit,
     navRequest: Int,
     navCounter: Int,
+    finished: Boolean,
+    onNextChapter: (Int) -> Unit,
+    onFinishWork: () -> Unit,
 ) {
     val measurer = rememberTextMeasurer(cacheSize = 0)
     val density = LocalDensity.current
@@ -401,26 +425,35 @@ private fun PagedReader(
         val startPage = if (position.block == Int.MAX_VALUE) pageList.lastIndex else pageList.indexOfPosition(position.block, position.char)
 
         key(chapterIndex, pageList) {
-            val pagerState = rememberPagerState(initialPage = startPage + lead) { pageList.size + lead + (if (hasNext) 1 else 0) }
+            // Trailing page after the last text page: end-of-chapter / end-of-work actions.
+            val pagerState = rememberPagerState(initialPage = startPage + lead) { pageList.size + lead + 1 }
             val scope = rememberCoroutineScope()
 
             fun turn(delta: Int) {
                 val target = pagerState.currentPage + delta
-                scope.launch {
-                    if (target in 0 until pagerState.pageCount) pagerState.animateScrollToPage(target)
+                when {
+                    target in 0 until pagerState.pageCount -> scope.launch { pagerState.animateScrollToPage(target) }
+                    target >= pagerState.pageCount && hasNext -> onNextChapter(chapterIndex + 1)
                 }
             }
 
+            // Positions this pager reported itself must not be treated as external jumps.
+            var lastReported by remember { mutableStateOf<Position?>(null) }
+            fun report(p: Position) { lastReported = p; onPosition(p) }
             LaunchedEffect(pagerState) {
                 snapshotFlow { pagerState.settledPage }.collect { page ->
                     val idx = page - lead
                     when {
-                        idx < 0 -> onPosition(Position(chapterIndex - 1, Int.MAX_VALUE, 0))
-                        idx >= pageList.size -> onPosition(Position(chapterIndex + 1, 0, 0))
+                        idx < 0 -> report(Position(chapterIndex - 1, Int.MAX_VALUE, 0))
+                        // Reaching the end page of the last chapter counts as the end of the work.
+                        idx >= pageList.size -> if (!hasNext) {
+                            val last = pageList.last().slices.last()
+                            report(Position(chapterIndex, last.blockIndex, last.start, atEnd = true))
+                        }
                         else -> {
                             val first = pageList[idx].first
                             val last = chapterIndex == chapters.lastIndex && idx == pageList.lastIndex
-                            onPosition(Position(chapterIndex, first.blockIndex, first.start, atEnd = last))
+                            report(Position(chapterIndex, first.blockIndex, first.start, atEnd = last))
                         }
                     }
                 }
@@ -428,7 +461,7 @@ private fun PagedReader(
             LaunchedEffect(navCounter) { if (navCounter != 0) turn(navRequest) }
             // External jumps inside this chapter (progress slider).
             LaunchedEffect(position.block, position.char) {
-                if (position.block == Int.MAX_VALUE) return@LaunchedEffect
+                if (position.block == Int.MAX_VALUE || position == lastReported) return@LaunchedEffect
                 val idx = pageList.indexOfPosition(position.block, position.char) + lead
                 val shownIdx = pagerState.settledPage - lead
                 val shownFirst = pageList.getOrNull(shownIdx)?.first
@@ -469,7 +502,13 @@ private fun PagedReader(
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         when {
                             idx < 0 -> ChapterEdge(stringResource(R.string.reader_prev_chapter), chapters[chapterIndex - 1].title, colors)
-                            idx >= pageList.size -> ChapterEdge(stringResource(R.string.reader_next_chapter), chapters[chapterIndex + 1].title, colors)
+                            idx >= pageList.size -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                ChapterEndActions(
+                                    isLast = !hasNext, finished = finished,
+                                    nextTitle = chapters.getOrNull(chapterIndex + 1)?.title, colors = colors,
+                                    onNextChapter = { onNextChapter(chapterIndex + 1) }, onFinishWork = onFinishWork,
+                                )
+                            }
                             else -> SelectionContainer { PageView(chapter, pageList[idx], styles, colors) }
                         }
                     }
@@ -482,6 +521,46 @@ private fun PagedReader(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Shown after each chapter: "本章讀完 → 下一章", or on the last chapter "作品讀完了", which marks the
+ * work finished (100%) regardless of scroll position.
+ */
+@Composable
+private fun ChapterEndActions(
+    isLast: Boolean,
+    finished: Boolean,
+    nextTitle: String?,
+    colors: ReaderColors,
+    onNextChapter: () -> Unit,
+    onFinishWork: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.width(48.dp).height(1.dp).background(colors.secondary.copy(alpha = 0.4f)))
+        Spacer(Modifier.height(24.dp))
+        if (!isLast) {
+            Button(onClick = onNextChapter, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.reader_chapter_done))
+            }
+            if (nextTitle != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(nextTitle, color = colors.secondary, fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis)
+            }
+        } else if (!finished) {
+            Button(onClick = onFinishWork, modifier = Modifier.height(48.dp)) {
+                Text(stringResource(R.string.reader_work_done))
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.reader_work_done_desc), color = colors.secondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+        } else {
+            Text(stringResource(R.string.reader_work_finished), color = colors.accent, fontSize = 16.sp, textAlign = TextAlign.Center)
         }
     }
 }

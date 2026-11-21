@@ -214,4 +214,8 @@
     <string name="work_read_again">Read again</string>
     <string name="search_group_freeform">Tags</string>
     <string name="search_tags_failed">Couldn\'t load tag suggestions: %1$s</string>
+    <string name="reader_chapter_done">Done with this chapter → Next</string>
+    <string name="reader_work_done">Finished this work</string>
+    <string name="reader_work_done_desc">Marks it as 100% read</string>
+    <string name="reader_work_finished">✓ You finished this work</string>
 </resources>

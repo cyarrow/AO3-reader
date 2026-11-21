@@ -5,9 +5,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -98,6 +100,32 @@ class ScreenshotTest {
             .performTouchInput { swipeUp() }
         settle()
         captureScreenRoboImage(File(out, "reader_settings_dark_system.png").path)
+    }
+
+    @Test fun readerScrollChapterEnd() {
+        settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
+        app.container.library.saveProgress(1L, 0, 6, 0, 0.3f)
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        captureScreenRoboImage(File(out, "reader_chapter_end.png").path)
+    }
+
+    @Test fun readerPagedWorkEnd() {
+        settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper, tapHintShown = true) }
+        app.container.library.saveProgress(1L, work.chapters.lastIndex, 9999, 0, 0.9f)
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.9f, height * 0.5f)) }
+        compose.mainClock.advanceTimeBy(3000)
+        settle()
+        println("WORK_END_BUTTON=" + compose.onAllNodesWithText("作品讀完了").fetchSemanticsNodes().size)
+        captureScreenRoboImage(File(out, "reader_work_end.png").path)
+        compose.onNodeWithText("作品讀完了").performClick()
+        settle()
+        val entry = app.container.library.entry(1L)!!
+        org.junit.Assert.assertTrue(entry.finished)
+        org.junit.Assert.assertEquals(1f, entry.fraction, 0.0001f)
+        compose.onNodeWithText("✓ 已讀完這部作品").assertExists()
     }
 
     @Test fun readerChrome() {

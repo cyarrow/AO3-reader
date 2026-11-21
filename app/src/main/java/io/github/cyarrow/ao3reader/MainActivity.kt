@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                         val id = entry.arguments!!.getLong("id")
                         WorkScreen(container, id, onBack = { nav.popBackStack() }, onRead = { chapter ->
                             if (chapter != null) {
-                                container.library.update(id) { e -> e?.copy(chapterIndex = chapter, blockIndex = 0, charOffset = 0) }
+                                container.library.update(id) { e -> e?.copy(chapterIndex = chapter, blockIndex = 0, charOffset = 0, finished = false) }
                             }
                             nav.navigate("reader/$id")
                         }, onSearch = { q ->

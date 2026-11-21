@@ -197,10 +197,10 @@ private fun ContinueCard(e: LibraryEntry, onRead: () -> Unit, onDetails: () -> U
                 Text(stringResource(R.string.reader_chapter_of, e.chapterIndex + 1, e.chapterCount),
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.weight(1f))
-                Text(progressLabel(e.fraction), style = MaterialTheme.typography.labelLarge,
+                Text(progressLabel(e), style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary)
             }
-            LinearProgressIndicator(progress = { e.fraction }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            LinearProgressIndicator(progress = { if (e.isFinished) 1f else e.fraction }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 drawStopIndicator = {})
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onRead, modifier = Modifier.weight(1f).height(48.dp)) {
@@ -231,11 +231,11 @@ private fun HistoryRow(e: LibraryEntry, onClick: () -> Unit, onLongClick: () -> 
             )
         }
         Spacer(Modifier.width(12.dp))
-        Text(progressLabel(e.fraction), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+        Text(progressLabel(e), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
     }
 }
 
 /** "42%" while reading, "已讀完" once the end was reached. */
 @Composable
-fun progressLabel(fraction: Float): String =
-    if (fraction >= 0.999f) stringResource(R.string.progress_finished) else "${(fraction * 100).toInt()}%"
+fun progressLabel(e: LibraryEntry): String =
+    if (e.isFinished) stringResource(R.string.progress_finished) else "${(e.fraction * 100).toInt()}%"

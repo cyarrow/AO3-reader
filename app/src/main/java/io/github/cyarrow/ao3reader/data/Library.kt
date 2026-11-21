@@ -43,7 +43,11 @@ data class LibraryEntry(
     val remoteChapters: String = "",
     val checkedAt: Long = 0,
     val addedAt: Long = 0,
+    /** Marked as finished by the reader ("作品讀完了"); stays until reading again from the start. */
+    val finished: Boolean = false,
 ) {
+    val isFinished: Boolean get() = finished || fraction >= 0.999f
+
     /** Published chapter count is the number before the slash. */
     val hasUpdate: Boolean get() = remoteChapters.isNotEmpty() &&
         (remoteChapters.substringBefore('/').toIntOrNull() ?: 0) > (savedChapters.substringBefore('/').toIntOrNull() ?: chapterCount)
@@ -101,7 +105,7 @@ class Library(context: Context) {
                 chapterIndex = chapterIndex,
                 blockIndex = blockIndex,
                 charOffset = charOffset,
-                fraction = fraction,
+                fraction = if (e.finished) maxOf(fraction, e.fraction) else fraction,
                 lastReadAt = System.currentTimeMillis(),
             )
         }
@@ -111,6 +115,10 @@ class Library(context: Context) {
     fun favoriteFandoms(limit: Int = 8): List<String> =
         _entries.value.values.flatMap { it.fandoms }.groupingBy { it }.eachCount()
             .entries.sortedByDescending { it.value }.take(limit).map { it.key }
+
+    fun markFinished(id: Long, finished: Boolean) {
+        update(id) { it?.copy(finished = finished, fraction = if (finished) 1f else it.fraction, lastReadAt = System.currentTimeMillis()) }
+    }
 
     fun savedSizeBytes(id: Long): Long = File(worksDir, "$id.json").length()
 

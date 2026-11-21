@@ -212,4 +212,8 @@
     <string name="work_read_again">再讀一次</string>
     <string name="search_group_freeform">標籤</string>
     <string name="search_tags_failed">無法取得標籤建議：%1$s</string>
+    <string name="reader_chapter_done">本章讀完 → 下一章</string>
+    <string name="reader_work_done">作品讀完了</string>
+    <string name="reader_work_done_desc">標記為已讀完（100%）</string>
+    <string name="reader_work_finished">✓ 已讀完這部作品</string>
 </resources>

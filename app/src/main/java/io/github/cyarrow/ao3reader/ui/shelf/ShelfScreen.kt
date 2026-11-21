@@ -150,7 +150,7 @@ fun ShelfScreen(container: AppContainer, onRead: (Long) -> Unit, onOpenWork: (Lo
                         Text(e.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             e.authors.joinToString(", ") + " · " + stringResource(R.string.stat_chapters, e.savedChapters.ifEmpty { e.chapterCount.toString() }) +
-                                (if (e.lastReadAt > 0) " · " + io.github.cyarrow.ao3reader.ui.home.progressLabel(e.fraction) else ""),
+                                (if (e.lastReadAt > 0) " · " + io.github.cyarrow.ao3reader.ui.home.progressLabel(e) else ""),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
