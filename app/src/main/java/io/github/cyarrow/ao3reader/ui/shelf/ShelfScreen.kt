@@ -67,6 +67,7 @@ import io.github.cyarrow.ao3reader.R
 import io.github.cyarrow.ao3reader.data.LibraryEntry
 import io.github.cyarrow.ao3reader.ui.common.errorMessage
 import io.github.cyarrow.ao3reader.ui.home.progressLabel
+import io.github.cyarrow.ao3reader.ui.motion.Motion
 import kotlinx.coroutines.launch
 
 enum class ShelfTab(val label: Int) {
@@ -252,6 +253,11 @@ fun ShelfScreen(container: AppContainer, onRead: (Long) -> Unit, onOpenWork: (Lo
                 items(shown, key = { it.workId }) { e ->
                     val isSelected = e.workId in selected
                     ShelfRow(
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = Motion.enter(Motion.Standard),
+                            placementSpec = Motion.enter(Motion.Standard),
+                            fadeOutSpec = Motion.exit(Motion.Fast),
+                        ),
                         e = e,
                         selecting = selecting,
                         isSelected = isSelected,
@@ -291,6 +297,7 @@ fun ShelfScreen(container: AppContainer, onRead: (Long) -> Unit, onOpenWork: (Lo
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ShelfRow(
+    modifier: Modifier = Modifier,
     e: LibraryEntry,
     selecting: Boolean,
     isSelected: Boolean,
@@ -300,9 +307,12 @@ private fun ShelfRow(
     onUpdate: () -> Unit,
     onDetails: () -> Unit,
 ) {
-    val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else androidx.compose.ui.graphics.Color.Transparent
+    val bg by androidx.compose.animation.animateColorAsState(
+        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else androidx.compose.ui.graphics.Color.Transparent,
+        Motion.enter(Motion.Fast), label = "selection",
+    )
     Row(
-        Modifier.fillMaxWidth().background(bg)
+        modifier.fillMaxWidth().background(bg)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

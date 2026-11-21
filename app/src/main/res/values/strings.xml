@@ -236,4 +236,6 @@
     <string name="shelf_select_all">Select all</string>
     <string name="shelf_remove_title">Remove %1$d works?</string>
     <string name="shelf_remove_desc">They are removed from this device together with reading progress. Your AO3 account is not affected.</string>
+    <string name="reader_page_animation">Page turn animation</string>
+    <string name="reader_page_animation_desc">Slide when turning pages by tapping or with the volume keys</string>
 </resources>

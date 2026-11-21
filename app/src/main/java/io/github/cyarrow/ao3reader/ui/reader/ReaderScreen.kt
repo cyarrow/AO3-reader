@@ -4,6 +4,8 @@ import android.app.Activity
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -69,6 +71,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.animation.core.tween
+import io.github.cyarrow.ao3reader.ui.motion.Motion
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -244,9 +248,13 @@ private fun ReaderBody(
             onSettings = { showSettings = true; chromeVisible = false },
         )
 
-        if (s.mode == ReadingMode.Paged && s.tapToTurn && !s.tapHintShown) {
-            val scope = rememberCoroutineScope()
-            TapHint(colors) { scope.launch { container.readerPrefs.update { it.copy(tapHintShown = true) } } }
+        val hintScope = rememberCoroutineScope()
+        AnimatedVisibility(
+            visible = s.mode == ReadingMode.Paged && s.tapToTurn && !s.tapHintShown,
+            enter = fadeIn(Motion.enter(Motion.Standard)),
+            exit = fadeOut(Motion.exit(Motion.Fast)),
+        ) {
+            TapHint(colors) { hintScope.launch { container.readerPrefs.update { it.copy(tapHintShown = true) } } }
         }
     }
 
@@ -326,7 +334,7 @@ private fun ScrollReader(
     LaunchedEffect(navCounter) {
         if (navCounter == 0) return@LaunchedEffect
         val viewport = listState.layoutInfo.viewportSize.height
-        listState.animateScrollBy(navRequest * viewport * 0.88f)
+        listState.animateScrollBy(navRequest * viewport * 0.88f, Motion.enter(Motion.PageTurn))
     }
 
     val margin = s.horizontalMargin.dp
@@ -337,7 +345,14 @@ private fun ScrollReader(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.displayCutout)
-                    .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
+                    .pointerInput(Unit) {
+                        // A tap that catches a moving list only stops it; it must not also open the menu.
+                        var wasScrolling = false
+                        detectTapGestures(
+                            onPress = { wasScrolling = listState.isScrollInProgress },
+                            onTap = { if (!wasScrolling) onTap() },
+                        )
+                    },
                 contentPadding = PaddingValues(start = margin, end = margin, top = 40.dp, bottom = 96.dp),
             ) {
                 itemsIndexed(items, key = { _, it -> "${it.first}-${it.second}" }) { i, (ch, block) ->
@@ -394,8 +409,7 @@ private fun PagedReader(
 ) {
     val measurer = rememberTextMeasurer(cacheSize = 0)
     val density = LocalDensity.current
-    val chapterIndex = position.chapter.coerceIn(0, chapters.lastIndex)
-    val chapter = chapters[chapterIndex]
+    val wantedChapter = position.chapter.coerceIn(0, chapters.lastIndex)
 
     BoxWithConstraints(
         Modifier
@@ -408,16 +422,21 @@ private fun PagedReader(
         val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { (maxHeight - headerH - footerH).roundToPx() }
 
-        val pages by produceState<List<Page>?>(null, chapter, styles, widthPx, heightPx) {
-            value = null
-            value = withContext(Dispatchers.Default) {
-                Paginator(measurer, widthPx, heightPx, styles::style, styles::spacingAfterPx, styles.dividerHeightPx).paginate(chapter)
+        // Keep showing the previous pages while the next chapter is laid out (no spinner flash between chapters);
+        // only the very first layout shows a spinner.
+        // Pages stay tied to the chapter they were laid out for, so the old chapter keeps rendering correctly
+        // until the new one is ready.
+        val laid by produceState<Pair<Int, List<Page>>?>(null, chapters[wantedChapter], styles, widthPx, heightPx) {
+            val target = chapters[wantedChapter]
+            value = wantedChapter to withContext(Dispatchers.Default) {
+                Paginator(measurer, widthPx, heightPx, styles::style, styles::spacingAfterPx, styles.dividerHeightPx).paginate(target)
             }
         }
-        val pageList = pages ?: run {
+        val (chapterIndex, pageList) = laid ?: run {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = colors.accent) }
             return@BoxWithConstraints
         }
+        val chapter = chapters[chapterIndex]
 
         val hasPrev = chapterIndex > 0
         val hasNext = chapterIndex < chapters.lastIndex
@@ -432,7 +451,10 @@ private fun PagedReader(
             fun turn(delta: Int) {
                 val target = pagerState.currentPage + delta
                 when {
-                    target in 0 until pagerState.pageCount -> scope.launch { pagerState.animateScrollToPage(target) }
+                    target in 0 until pagerState.pageCount -> scope.launch {
+                        if (s.pageAnimation) pagerState.animateScrollToPage(target, animationSpec = tween(Motion.PageTurn, easing = Motion.EaseInOut))
+                        else pagerState.scrollToPage(target)
+                    }
                     target >= pagerState.pageCount && hasNext -> onNextChapter(chapterIndex + 1)
                 }
             }
@@ -461,7 +483,7 @@ private fun PagedReader(
             LaunchedEffect(navCounter) { if (navCounter != 0) turn(navRequest) }
             // External jumps inside this chapter (progress slider).
             LaunchedEffect(position.block, position.char) {
-                if (position.block == Int.MAX_VALUE || position == lastReported) return@LaunchedEffect
+                if (position.block == Int.MAX_VALUE || position == lastReported || position.chapter != chapterIndex) return@LaunchedEffect
                 val idx = pageList.indexOfPosition(position.block, position.char) + lead
                 val shownIdx = pagerState.settledPage - lead
                 val shownFirst = pageList.getOrNull(shownIdx)?.first
@@ -553,14 +575,29 @@ private fun ChapterEndActions(
                 Text(nextTitle, color = colors.secondary, fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 2,
                     overflow = TextOverflow.Ellipsis)
             }
-        } else if (!finished) {
-            Button(onClick = onFinishWork, modifier = Modifier.height(48.dp)) {
-                Text(stringResource(R.string.reader_work_done))
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.reader_work_done_desc), color = colors.secondary, fontSize = 13.sp, textAlign = TextAlign.Center)
         } else {
-            Text(stringResource(R.string.reader_work_finished), color = colors.accent, fontSize = 16.sp, textAlign = TextAlign.Center)
+            // A rare, earned moment: the button settles into the finished state instead of blinking.
+            androidx.compose.animation.AnimatedContent(
+                targetState = finished,
+                transitionSpec = {
+                    (fadeIn(Motion.enter(Motion.Standard)) + androidx.compose.animation.scaleIn(Motion.enter(Motion.Standard), initialScale = 0.94f))
+                        .togetherWith(fadeOut(Motion.exit(Motion.Fast)))
+                },
+                label = "finish",
+            ) { done ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (!done) {
+                        Button(onClick = onFinishWork, modifier = Modifier.height(48.dp)) {
+                            Text(stringResource(R.string.reader_work_done))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(stringResource(R.string.reader_work_done_desc), color = colors.secondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+                    } else {
+                        Text(stringResource(R.string.reader_work_finished), color = colors.accent, fontSize = 16.sp, textAlign = TextAlign.Center,
+                            modifier = Modifier.height(48.dp).wrapContentHeight())
+                    }
+                }
+            }
         }
     }
 }
@@ -641,7 +678,10 @@ private fun ReaderChrome(
     val bar = colors.background
     val line = colors.secondary.copy(alpha = 0.18f)
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { -it }, exit = fadeOut() + slideOutVertically { -it },
+        // The chrome is toggled constantly while reading: quick, decisive in, even quicker out.
+        AnimatedVisibility(visible,
+            enter = fadeIn(Motion.enter(Motion.Standard)) + slideInVertically(Motion.enter(Motion.Standard)) { -it },
+            exit = fadeOut(Motion.exit(Motion.Fast)) + slideOutVertically(Motion.exit(Motion.Fast)) { -it },
             modifier = Modifier.align(Alignment.TopCenter)) {
             Column(Modifier.fillMaxWidth().shadow(6.dp).background(bar)) {
             Row(
@@ -662,7 +702,9 @@ private fun ReaderChrome(
             HorizontalDivider(color = line)
             }
         }
-        AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { it }, exit = fadeOut() + slideOutVertically { it },
+        AnimatedVisibility(visible,
+            enter = fadeIn(Motion.enter(Motion.Standard)) + slideInVertically(Motion.enter(Motion.Standard)) { it },
+            exit = fadeOut(Motion.exit(Motion.Fast)) + slideOutVertically(Motion.exit(Motion.Fast)) { it },
             modifier = Modifier.align(Alignment.BottomCenter)) {
             Column(Modifier.fillMaxWidth().shadow(6.dp).background(bar).windowInsetsPadding(WindowInsets.navigationBars)) {
                 HorizontalDivider(color = line)

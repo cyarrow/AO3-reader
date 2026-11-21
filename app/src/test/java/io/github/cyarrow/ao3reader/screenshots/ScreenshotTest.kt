@@ -128,6 +128,22 @@ class ScreenshotTest {
         compose.onNodeWithText("✓ 已讀完這部作品").assertExists()
     }
 
+    /** Paged mode: chapter end page -> next chapter must switch cleanly (no crash, no spinner). */
+    @Test fun readerPagedNextChapter() {
+        settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper, tapHintShown = true) }
+        app.container.library.saveProgress(1L, 0, 9999, 0, 0.3f)
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.9f, height * 0.5f)) }
+        compose.mainClock.advanceTimeBy(1000)
+        settle()
+        compose.onNodeWithText("本章讀完 → 下一章").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        settle()
+        compose.onAllNodesWithText("番外: 結局", substring = true).fetchSemanticsNodes().let { org.junit.Assert.assertTrue(it.isNotEmpty()) }
+        captureScreenRoboImage(File(out, "reader_paged_next_chapter.png").path)
+    }
+
     @Test fun readerChrome() {
         settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
         compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }

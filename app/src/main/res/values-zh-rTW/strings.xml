@@ -234,4 +234,6 @@
     <string name="shelf_select_all">全選</string>
     <string name="shelf_remove_title">移除 %1$d 部作品？</string>
     <string name="shelf_remove_desc">會從這台裝置移除，閱讀進度也會一併刪除；不影響你的 AO3 帳號。</string>
+    <string name="reader_page_animation">翻頁動畫</string>
+    <string name="reader_page_animation_desc">點擊或音量鍵翻頁時滑動；關閉則立即換頁</string>
 </resources>

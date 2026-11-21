@@ -19,6 +19,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import io.github.cyarrow.ao3reader.ui.motion.Motion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -117,9 +122,29 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                 ) { outer ->
+                val tabRoutes = tabs.map { it.first }.toSet()
+                fun isTab(r: String?) = r in tabRoutes
+                // Tabs fade through (no direction); pushed screens slide a short distance and fade
+                // (Material shared X axis). The default is a 700ms crossfade, far too slow.
                 NavHost(
                     nav, startDestination = "home",
                     modifier = androidx.compose.ui.Modifier.padding(outer).consumeWindowInsets(outer),
+                    enterTransition = {
+                        if (isTab(initialState.destination.route) && isTab(targetState.destination.route))
+                            fadeIn(Motion.enter(Motion.Standard))
+                        else fadeIn(Motion.enter(Motion.Standard)) + slideInHorizontally(Motion.enter(Motion.Standard)) { it / 10 }
+                    },
+                    exitTransition = {
+                        if (isTab(initialState.destination.route) && isTab(targetState.destination.route))
+                            fadeOut(Motion.exit(Motion.Fast))
+                        else fadeOut(Motion.exit(Motion.Fast)) + slideOutHorizontally(Motion.enter(Motion.Standard)) { -it / 20 }
+                    },
+                    popEnterTransition = {
+                        fadeIn(Motion.enter(Motion.Standard)) + slideInHorizontally(Motion.enter(Motion.Standard)) { -it / 20 }
+                    },
+                    popExitTransition = {
+                        fadeOut(Motion.exit(Motion.Fast)) + slideOutHorizontally(Motion.enter(Motion.Standard)) { it / 10 }
+                    },
                 ) {
                     composable("home") {
                         val user by container.account.user.collectAsState()

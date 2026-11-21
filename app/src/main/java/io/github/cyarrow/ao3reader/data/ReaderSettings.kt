@@ -38,6 +38,8 @@ data class ReaderSettings(
     /** Screen brightness 0..1, or negative to follow the system. */
     val brightness: Float = -1f,
     val tapHintShown: Boolean = false,
+    /** Slide animation when turning pages by tap or volume key (swiping always follows the finger). */
+    val pageAnimation: Boolean = true,
 )
 
 private val Context.readerStore by preferencesDataStore(name = "reader")
