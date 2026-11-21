@@ -240,6 +240,7 @@ fun ReaderSettingsSheet(
             ToggleRow(stringResource(R.string.reader_justify), null, s.justify, colors) { v -> update { it.copy(justify = v) } }
             ToggleRow(stringResource(R.string.reader_show_notes), null, s.showNotes, colors) { v -> update { it.copy(showNotes = v) } }
             ToggleRow(stringResource(R.string.reader_tap_to_turn), stringResource(R.string.reader_tap_to_turn_desc), s.tapToTurn, colors) { v -> update { it.copy(tapToTurn = v) } }
+            ToggleRow(stringResource(R.string.reader_page_animation), stringResource(R.string.reader_page_animation_desc), s.pageAnimation, colors) { v -> update { it.copy(pageAnimation = v) } }
             ToggleRow(stringResource(R.string.reader_volume_keys), null, s.volumeKeys, colors) { v -> update { it.copy(volumeKeys = v) } }
             ToggleRow(stringResource(R.string.reader_keep_screen_on), null, s.keepScreenOn, colors) { v -> update { it.copy(keepScreenOn = v) } }
             Spacer(Modifier.height(8.dp))

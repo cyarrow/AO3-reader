@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: never back up or transfer the AO3 login cookie or account name. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="cookies.enc" />
+        <exclude domain="file" path="account.enc" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="cookies.enc" />
+        <exclude domain="file" path="account.enc" />
+    </device-transfer>
+</data-extraction-rules>

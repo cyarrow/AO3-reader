@@ -9,6 +9,7 @@ import java.io.InputStream
 class ChineseConverter private constructor(
     private val s2t: Dict,
     private val tw: Dict,
+    private val t2s: Dict,
     private val simplifiedOnly: Set<Char>,
     private val traditionalOnly: Set<Char>,
 ) {
@@ -41,6 +42,12 @@ class ChineseConverter private constructor(
             return out.toString()
         }
     }
+
+    fun toSimplified(text: String): String = t2s.convert(text)
+
+    /** The other-script spellings of [text] (e.g. 結構 → 结构), for searching works written in either script. */
+    fun variants(text: String): List<String> =
+        listOf(text, toSimplified(text), toTraditional(text, taiwanPhrases = false)).distinct()
 
     fun toTraditional(text: String, taiwanPhrases: Boolean): String {
         val t = s2t.convert(text)
@@ -81,6 +88,8 @@ class ChineseConverter private constructor(
             stPhrases: Map<String, String>,
             twPhrases: Map<String, String>,
             twVariants: Map<String, String>,
+            tsCharacters: Map<String, String> = emptyMap(),
+            tsPhrases: Map<String, String> = emptyMap(),
         ): ChineseConverter {
             val s2t = HashMap<String, String>(stCharacters.size + stPhrases.size)
             s2t.putAll(stCharacters)
@@ -102,7 +111,10 @@ class ChineseConverter private constructor(
             val ambiguous = simplifiedOnly intersect traditionalOnly
             simplifiedOnly -= ambiguous
             traditionalOnly -= ambiguous
-            return ChineseConverter(Dict(s2t), Dict(tw), simplifiedOnly, traditionalOnly)
+            val t2s = HashMap<String, String>(tsCharacters.size + tsPhrases.size)
+            t2s.putAll(tsCharacters)
+            t2s.putAll(tsPhrases)
+            return ChineseConverter(Dict(s2t), Dict(tw), Dict(t2s), simplifiedOnly, traditionalOnly)
         }
 
         fun fromStreams(open: (String) -> InputStream): ChineseConverter = create(
@@ -110,6 +122,8 @@ class ChineseConverter private constructor(
             stPhrases = open("STPhrases.txt").use(::parseDict),
             twPhrases = open("TWPhrases.txt").use(::parseDict),
             twVariants = open("TWVariants.txt").use(::parseDict),
+            tsCharacters = open("TSCharacters.txt").use(::parseDict),
+            tsPhrases = open("TSPhrases.txt").use(::parseDict),
         )
     }
 }

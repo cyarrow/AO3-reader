@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -24,8 +25,8 @@ class Ao3Client(private val client: OkHttpClient) {
     private val mutex = Mutex()
     private var lastRequestAt = 0L
 
-    suspend fun search(query: SearchQuery, page: Int): SearchPage {
-        val html = get(query.toUrl(page))
+    suspend fun search(query: SearchQuery, page: Int, keywordVariants: List<String> = emptyList()): SearchPage {
+        val html = get(query.toUrl(page, keywordVariants))
         return Ao3Parser.parseWorkList(html, page)
     }
 
@@ -47,7 +48,26 @@ class Ao3Client(private val client: OkHttpClient) {
     suspend fun autocomplete(type: String, term: String): List<String> {
         if (term.isBlank()) return emptyList()
         val url = "$BASE/autocomplete/$type".toHttpUrl().newBuilder().addQueryParameter("term", term.trim()).build()
-        return Ao3Parser.parseAutocomplete(get(url))
+        return Ao3Parser.parseAutocomplete(getWithRetry(url))
+    }
+
+    /** AO3's tag search: substring and Chinese matches the autocomplete can miss, most-used first. */
+    suspend fun searchTags(term: String): List<Ao3Parser.TagHit> {
+        val url = "$BASE/tags/search".toHttpUrl().newBuilder()
+            .addQueryParameter("tag_search[name]", term.trim())
+            .addQueryParameter("tag_search[sort_column]", "uses")
+            .addQueryParameter("tag_search[sort_direction]", "desc")
+            .addQueryParameter("commit", "Search Tags")
+            .build()
+        return Ao3Parser.parseTagSearch(getWithRetry(url))
+    }
+
+    /** Light requests retry once when AO3 asks us to slow down. */
+    private suspend fun getWithRetry(url: HttpUrl): String = try {
+        get(url)
+    } catch (e: Ao3Exception.RateLimited) {
+        delay(((e.retryAfterSeconds ?: 2L).coerceIn(1L, 5L)) * 1000)
+        get(url)
     }
 
     /** Result of a raw request: final URL after redirects and the body. */
@@ -57,6 +77,9 @@ class Ao3Client(private val client: OkHttpClient) {
     suspend fun fetch(url: String): Page = request(Request.Builder().url(url).build(), allowLogin = true)
 
     suspend fun post(url: String, fields: List<Pair<String, String>>, referer: String? = null): Page {
+        // Credentials and session-bound forms may only ever be submitted to AO3 itself over HTTPS,
+        // whatever action URL a parsed form claims.
+        require(isAo3(url)) { "Refusing to submit a form outside AO3" }
         val body = okhttp3.FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build()
         val req = Request.Builder().url(url).post(body).apply { if (referer != null) header("Referer", referer) }.build()
         return request(req, allowLogin = true)
@@ -83,6 +106,12 @@ class Ao3Client(private val client: OkHttpClient) {
             lastRequestAt = System.currentTimeMillis()
         }
     }
+}
+
+/** True for https URLs on archiveofourown.org (or its www host). */
+fun isAo3(url: String): Boolean {
+    val u = url.toHttpUrlOrNull() ?: return false
+    return u.isHttps && (u.host == "archiveofourown.org" || u.host == "www.archiveofourown.org")
 }
 
 /** Extracts a work id from a pasted AO3 link or a bare number. */

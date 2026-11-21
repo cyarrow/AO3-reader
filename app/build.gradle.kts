@@ -100,12 +100,29 @@ dependencies {
 }
 
 // Optional local fixtures (real AO3 downloads that must not be committed): -PlocalFixtures=/path/to/dir
+// Robolectric's Android runtime jar is resolved by Gradle (cached, retried) instead of being downloaded
+// by Robolectric itself at test time, which was flaky on CI. Keep the version in step with the SDK the
+// tests run on (@Config(sdk = [35])) and the Robolectric version.
+val robolectricRuntime: Configuration by configurations.creating { isTransitive = false }
+dependencies {
+    robolectricRuntime("org.robolectric:android-all-instrumented:15-robolectric-13954326-i7")
+}
+val robolectricJarsDir = layout.buildDirectory.dir("robolectric-jars")
+val prepareRobolectricRuntime by tasks.registering(Copy::class) {
+    from(robolectricRuntime)
+    into(robolectricJarsDir)
+}
+
 // Screenshots (Roborazzi) are only recorded on demand: -Pscreenshots
 tasks.withType<Test>().configureEach {
+    dependsOn(prepareRobolectricRuntime)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricJarsDir.get().asFile.absolutePath)
     (findProperty("localFixtures") as String?)?.let { systemProperty("localFixtures", it) }
     val record = project.hasProperty("screenshots")
     systemProperty("roborazzi.test.record", record.toString())
     systemProperty("screenshots", record.toString())
     systemProperty("robolectric.pixelCopyRenderMode", "hardware")
     maxHeapSize = "3g"
+    (findProperty("live") as String?)?.let { systemProperty("live", it) }
 }

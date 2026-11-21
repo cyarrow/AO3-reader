@@ -12,3 +12,25 @@ fun ReaderTheme.colors(): ReaderColors = when (this) {
     ReaderTheme.Dark -> ReaderColors(Color(0xFF1C1B1A), Color(0xFFCFCAC2), Color(0xFF8A857E), Color(0xFFE59A8C), true)
     ReaderTheme.Black -> ReaderColors(Color(0xFF000000), Color(0xFFA8A49E), Color(0xFF6B6863), Color(0xFFC77D70), true)
 }
+
+/**
+ * Material colors that follow the reader theme rather than the system light/dark setting, so sheets and
+ * controls (switches, segmented buttons) stay legible on a paper theme while the phone is in dark mode.
+ */
+fun ReaderColors.materialScheme(): androidx.compose.material3.ColorScheme {
+    val faint = androidx.compose.ui.graphics.lerp(background, text, 0.08f)
+    val container = androidx.compose.ui.graphics.lerp(background, accent, if (isDark) 0.28f else 0.16f)
+    return if (isDark) androidx.compose.material3.darkColorScheme(
+        primary = accent, onPrimary = background, primaryContainer = container, onPrimaryContainer = text,
+        secondary = secondary, onSecondary = background, secondaryContainer = container, onSecondaryContainer = text,
+        background = background, onBackground = text, surface = background, onSurface = text,
+        surfaceVariant = faint, onSurfaceVariant = secondary, outline = secondary, outlineVariant = faint,
+        surfaceContainerHighest = faint, surfaceContainerHigh = faint, surfaceContainer = faint,
+    ) else androidx.compose.material3.lightColorScheme(
+        primary = accent, onPrimary = Color.White, primaryContainer = container, onPrimaryContainer = text,
+        secondary = secondary, onSecondary = Color.White, secondaryContainer = container, onSecondaryContainer = text,
+        background = background, onBackground = text, surface = background, onSurface = text,
+        surfaceVariant = faint, onSurfaceVariant = secondary, outline = secondary, outlineVariant = faint,
+        surfaceContainerHighest = faint, surfaceContainerHigh = faint, surfaceContainer = faint,
+    )
+}

@@ -180,11 +180,16 @@ fun WorkScreen(
 
                     // Primary action
                     Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { onRead(null) }, modifier = Modifier.weight(1f).height(48.dp)) {
+                        Button(onClick = {
+                            if (entry != null && entry.isFinished) container.library.markFinished(id, false)
+                            onRead(if (entry != null && entry.isFinished) 0 else null)
+                        }, modifier = Modifier.weight(1f).height(48.dp)) {
                             Icon(Icons.AutoMirrored.Filled.MenuBook, null, Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                if (entry != null && entry.lastReadAt > 0)
+                                if (entry != null && entry.lastReadAt > 0 && entry.isFinished)
+                                    stringResource(R.string.work_read_again)
+                                else if (entry != null && entry.lastReadAt > 0)
                                     stringResource(R.string.work_continue, entry.chapterIndex + 1, (entry.fraction * 100).toInt())
                                 else stringResource(R.string.work_start)
                             )

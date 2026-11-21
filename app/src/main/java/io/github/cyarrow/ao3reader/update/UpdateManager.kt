@@ -80,7 +80,9 @@ class UpdateManager(
                 ?: return@withContext CheckResult.Failed("Bad tag ${release.tagName}")
             val current = Version.parse(currentVersion)
                 ?: return@withContext CheckResult.Failed("Bad version $currentVersion")
-            val apk = release.assets.firstOrNull { it.name.endsWith(".apk") }
+            val apk = release.assets.firstOrNull {
+                it.name.endsWith(".apk") && it.downloadUrl.startsWith("https://github.com/${BuildConfig.UPDATE_REPO}/releases/download/")
+            }
             if (release.draft || release.prerelease || apk == null || latest <= current) {
                 CheckResult.UpToDate
             } else {
@@ -138,7 +140,40 @@ class UpdateManager(
             }
         }
         if (!partial.renameTo(target)) throw IOException("Cannot save APK")
+        if (!verify(target)) {
+            target.delete()
+            throw IOException("Downloaded APK is not signed by this app's key")
+        }
         target
+    }
+
+    /**
+     * Refuses an APK that is not this app signed with this app's key. Android would reject a
+     * mismatched update of the same package anyway, but a different package would install as a new app.
+     */
+    fun verify(apk: File): Boolean {
+        val pm = context.packageManager
+        @Suppress("DEPRECATION")
+        val flags = if (android.os.Build.VERSION.SDK_INT >= 28) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+            else android.content.pm.PackageManager.GET_SIGNATURES
+        val archive = pm.getPackageArchiveInfo(apk.path, flags) ?: return false
+        if (archive.packageName != context.packageName) return false
+        val installed = pm.getPackageInfo(context.packageName, flags)
+        fun certs(info: android.content.pm.PackageInfo): Set<String> {
+            @Suppress("DEPRECATION")
+            val sigs = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                info.signingInfo?.let { if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory }
+            } else info.signatures
+            return sigs.orEmpty().map { sig ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) }
+            }.toSet()
+        }
+        val expected = certs(installed)
+        val actual = certs(archive)
+        // Some Android versions can't read an archive's certificates; the package check above still holds,
+        // and the system installer itself refuses a same-package update signed with a different key.
+        if (expected.isEmpty() || actual.isEmpty()) return true
+        return actual.any { it in expected }
     }
 
     fun canInstallPackages(): Boolean = context.packageManager.canRequestPackageInstalls()

@@ -53,7 +53,10 @@ class PersistentCookieJar(private val store: SecureStore?) : CookieJar {
     }
 
     private fun persist() = runCatching {
-        store?.write(json.encodeToString(cookies.filter { it.persistent || it.name.contains("session") }.map {
+        // Only AO3's login cookies are worth keeping across launches.
+        store?.write(json.encodeToString(cookies.filter {
+            it.domain.endsWith("archiveofourown.org") && (it.persistent || it.name.contains("session"))
+        }.map {
             StoredCookie(it.name, it.value, it.expiresAt, it.domain, it.path, it.secure, it.httpOnly, it.hostOnly, it.persistent)
         }))
     }.let { }

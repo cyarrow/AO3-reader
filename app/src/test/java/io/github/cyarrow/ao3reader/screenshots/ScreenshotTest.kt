@@ -5,8 +5,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -84,6 +87,63 @@ class ScreenshotTest {
         captureScreenRoboImage(File(out, "reader_settings.png").path)
     }
 
+    /** Phone in dark mode, reader on the paper theme: controls must follow the reader theme. */
+    @Test @Config(qualifiers = "+night") fun readerSettingsDarkSystem() {
+        settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(center) }
+        settle()
+        compose.onNodeWithText("顯示").performClick()
+        settle()
+        compose.onNode(androidx.compose.ui.test.hasScrollAction() and androidx.compose.ui.test.hasAnyChild(androidx.compose.ui.test.hasText("亮度")))
+            .performTouchInput { swipeUp() }
+        settle()
+        captureScreenRoboImage(File(out, "reader_settings_dark_system.png").path)
+    }
+
+    @Test fun readerScrollChapterEnd() {
+        settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
+        app.container.library.saveProgress(1L, 0, 6, 0, 0.3f)
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        captureScreenRoboImage(File(out, "reader_chapter_end.png").path)
+    }
+
+    @Test fun readerPagedWorkEnd() {
+        settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper, tapHintShown = true) }
+        app.container.library.saveProgress(1L, work.chapters.lastIndex, 9999, 0, 0.9f)
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.9f, height * 0.5f)) }
+        compose.mainClock.advanceTimeBy(3000)
+        settle()
+        println("WORK_END_BUTTON=" + compose.onAllNodesWithText("作品讀完了").fetchSemanticsNodes().size)
+        captureScreenRoboImage(File(out, "reader_work_end.png").path)
+        compose.onNodeWithText("作品讀完了").performClick()
+        settle()
+        val entry = app.container.library.entry(1L)!!
+        org.junit.Assert.assertTrue(entry.finished)
+        org.junit.Assert.assertEquals(1f, entry.fraction, 0.0001f)
+        compose.onNodeWithText("✓ 已讀完這部作品").assertExists()
+    }
+
+    /** Paged mode: chapter end page -> next chapter must switch cleanly (no crash, no spinner). */
+    @Test fun readerPagedNextChapter() {
+        settings { it.copy(mode = ReadingMode.Paged, theme = ReaderTheme.Paper, tapHintShown = true) }
+        app.container.library.saveProgress(1L, 0, 9999, 0, 0.3f)
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.9f, height * 0.5f)) }
+        compose.mainClock.advanceTimeBy(1000)
+        settle()
+        compose.onNodeWithText("本章讀完 → 下一章").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        settle()
+        compose.onAllNodesWithText("番外: 結局", substring = true).fetchSemanticsNodes().let { org.junit.Assert.assertTrue(it.isNotEmpty()) }
+        captureScreenRoboImage(File(out, "reader_paged_next_chapter.png").path)
+    }
+
     @Test fun readerChrome() {
         settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
         compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
@@ -114,6 +174,36 @@ class ScreenshotTest {
             AO3ReaderTheme(dynamicColor = false) { HomeScreen(app.container.library, {}, {}, {}, {}) }
         }
         compose.onRoot().captureRoboImage(File(out, "home.png").path)
+    }
+
+    @Test fun searchStart() {
+        compose.setContent { AO3ReaderTheme { io.github.cyarrow.ao3reader.ui.search.SearchScreen(app.container, null) {} } }
+        settle()
+        compose.onRoot().captureRoboImage(File(out, "search_start.png").path)
+    }
+
+    @Test fun searchSuggestions() {
+        compose.setContent {
+            AO3ReaderTheme {
+                androidx.compose.foundation.layout.Column {
+                    io.github.cyarrow.ao3reader.ui.search.ActiveFilters(
+                        io.github.cyarrow.ao3reader.ao3.SearchQuery(query = "結構", relationships = "Lee Heeseung/Sim Jaeyun | Jake"),
+                        "1 - 20 of 312 Works", {}, {},
+                    )
+                    io.github.cyarrow.ao3reader.ui.search.SuggestionList(
+                        "heejake",
+                        io.github.cyarrow.ao3reader.ui.search.Suggestions(
+                            "heejake",
+                            fandoms = listOf("ENHYPEN (Band)"),
+                            relationships = listOf("Lee Heeseung/Sim Jaeyun | Jake", "Heejake - Relationship"),
+                            characters = listOf("Sim Jaeyun | Jake"),
+                        ),
+                        {}, { _, _ -> },
+                    )
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage(File(out, "search_suggestions.png").path)
     }
 
     @Test fun login() {

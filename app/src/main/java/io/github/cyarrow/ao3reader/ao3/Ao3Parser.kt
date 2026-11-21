@@ -57,6 +57,31 @@ object Ao3Parser {
         )
     }
 
+    /** One result row from AO3's tag search page. */
+    data class TagHit(val type: String, val name: String, val uses: Int)
+
+    /**
+     * Parses /tags/search results: rows like "Fandom: <a class="tag">RIIZE (Band)</a> (1234)".
+     * [type] is normalized to fandom / relationship / character / freeform.
+     */
+    fun parseTagSearch(html: String): List<TagHit> {
+        val doc = Jsoup.parse(html, Ao3Client.BASE)
+        val rows = doc.select("ol.tag.index li, ul.tag.index li").ifEmpty { doc.select("#main li:has(a.tag)") }
+        return rows.mapNotNull { li ->
+            val a = li.selectFirst("a.tag") ?: return@mapNotNull null
+            val label = li.text().substringBefore(':').trim().lowercase()
+            val type = when {
+                label.startsWith("fandom") -> "fandom"
+                label.startsWith("relationship") -> "relationship"
+                label.startsWith("character") -> "character"
+                label.startsWith("freeform") || label.startsWith("additional") -> "freeform"
+                else -> return@mapNotNull null
+            }
+            val uses = Regex("""\((\d[\d,]*)\)\s*$""").find(li.text())?.groupValues?.get(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
+            TagHit(type, a.text().trim(), uses)
+        }
+    }
+
     /** Parses `[{"id": "...", "name": "..."}]` from AO3's autocomplete endpoints. */
     fun parseAutocomplete(json: String): List<String> = runCatching {
         kotlinx.serialization.json.Json.parseToJsonElement(json).let { it as kotlinx.serialization.json.JsonArray }

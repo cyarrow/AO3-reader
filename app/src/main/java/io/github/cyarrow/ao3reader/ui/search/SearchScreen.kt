@@ -1,6 +1,24 @@
 package io.github.cyarrow.ao3reader.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,19 +83,36 @@ import io.github.cyarrow.ao3reader.ao3.SearchQuery
 import io.github.cyarrow.ao3reader.ui.common.WorkCard
 import io.github.cyarrow.ao3reader.ui.common.errorMessage
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(container: AppContainer, onBack: (() -> Unit)?, onOpenWork: (Long) -> Unit) {
     val vm: SearchViewModel = viewModel { SearchViewModel(container) }
     val state by vm.state.collectAsState()
-    var text by remember(state.query.query) { mutableStateOf(state.query.query) }
+    val suggestions by vm.suggestions.collectAsState()
+    val recent by vm.recent.collectAsState(initial = emptyList())
+    var text by remember { mutableStateOf("") }
+    var typing by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
+
     // A tag search requested while this tab was kept alive.
     LaunchedEffect(Unit) { container.pendingSearch?.let { container.pendingSearch = null; vm.search(it) } }
+    // Keep the box in sync with the keyword of the active search.
+    LaunchedEffect(state.query.query, state.searched) { if (!typing) text = if (state.searched) state.query.query else "" }
 
-    // Load the next page when the end of the list comes into view.
+    fun run(q: SearchQuery) {
+        focus.clearFocus()
+        typing = false
+        text = q.query
+        vm.search(q)
+    }
+
+    BackHandler(enabled = typing || state.searched) {
+        if (typing) { typing = false; focus.clearFocus(); text = if (state.searched) state.query.query else "" }
+        else vm.clear()
+    }
+
     val nearEnd by remember {
         derivedStateOf {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -85,64 +120,82 @@ fun SearchScreen(container: AppContainer, onBack: (() -> Unit)?, onOpenWork: (Lo
         }
     }
     LaunchedEffect(nearEnd, state.results.size) {
-        if (nearEnd && state.error == null && state.results.isNotEmpty()) vm.loadMore()
+        if (state.searched && nearEnd && state.error == null && state.results.isNotEmpty()) vm.loadMore()
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                navigationIcon = {
+            Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
-                },
-                title = {
-                    TextField(
+                    else if (state.searched || typing) IconButton(onClick = {
+                        typing = false; focus.clearFocus(); vm.clear()
+                    }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    OutlinedTextField(
                         value = text,
-                        onValueChange = { text = it },
-                        placeholder = { Text(stringResource(R.string.search_hint)) },
+                        onValueChange = { text = it; typing = true; vm.suggest(it) },
+                        placeholder = { Text(stringResource(R.string.search_placeholder), maxLines = 1) },
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Filled.Search, null) },
                         trailingIcon = {
-                            if (text.isNotEmpty()) IconButton(onClick = { text = "" }) { Icon(Icons.Filled.Clear, null) }
+                            if (text.isNotEmpty()) IconButton(onClick = { text = ""; vm.suggest("") }) {
+                                Icon(Icons.Filled.Clear, stringResource(R.string.search_clear))
+                            }
                         },
+                        shape = RoundedCornerShape(28.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
-                            focus.clearFocus()
-                            vm.search(state.query.copy(query = text))
+                            run(state.query.copy(query = text.trim()))
                         }),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) typing = true },
                     )
-                },
-                actions = {
-                    IconButton(onClick = { showFilters = true }) { Icon(Icons.Filled.Tune, stringResource(R.string.search_filters)) }
-                },
-            )
+                }
+            }
         },
     ) { padding ->
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(padding)) {
-            item {
-                ActiveFilters(state.query, state.total) { showFilters = true }
-            }
-            items(state.results, key = { it.id }) { work ->
-                WorkCard(work) { onOpenWork(work.id) }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            }
-            item {
-                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    when {
-                        state.loading -> CircularProgressIndicator()
-                        state.error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(errorMessage(state.error!!), textAlign = TextAlign.Center)
-                            Spacer(Modifier.height(12.dp))
-                            Button(onClick = vm::retry) { Text(stringResource(R.string.retry)) }
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when {
+                typing && text.isNotBlank() -> SuggestionList(text.trim(), suggestions,
+                    onKeyword = { run(state.query.copy(query = it)) },
+                    onTag = { type, tag ->
+                        val base = SearchQuery(language = state.query.language, sort = SearchQuery.Sort.Kudos, ratings = state.query.ratings)
+                        run(when (type) {
+                            "fandom" -> base.copy(fandoms = tag, sort = SearchQuery.Sort.Updated)
+                            "relationship" -> base.copy(relationships = tag)
+                            "freeform" -> base.copy(freeforms = tag)
+                            else -> base.copy(characters = tag)
+                        })
+                    })
+                !state.searched -> StartPage(
+                    recent = recent,
+                    fandoms = container.library.favoriteFandoms(),
+                    language = state.query.language,
+                    onSearch = ::run,
+                    onClearRecent = { vm.clearRecent() },
+                )
+                else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                    item {
+                        ActiveFilters(state.query, state.total,
+                            onChange = { vm.search(it) },
+                            onMore = { showFilters = true })
+                    }
+                    items(state.results, key = { it.id }) { work ->
+                        WorkCard(work) { onOpenWork(work.id) }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    }
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            when {
+                                state.loading -> CircularProgressIndicator()
+                                state.error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(errorMessage(state.error!!), textAlign = TextAlign.Center)
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(onClick = vm::retry) { Text(stringResource(R.string.retry)) }
+                                }
+                                state.results.isEmpty() -> Text(stringResource(R.string.search_no_results), textAlign = TextAlign.Center)
+                                !state.hasNext -> Text(stringResource(R.string.search_end), color = MaterialTheme.colorScheme.outline)
+                            }
                         }
-                        state.searched && state.results.isEmpty() -> Text(stringResource(R.string.search_no_results))
-                        !state.hasNext && state.results.isNotEmpty() -> Text(
-                            stringResource(R.string.search_end), color = MaterialTheme.colorScheme.outline,
-                        )
                     }
                 }
             }
@@ -150,30 +203,184 @@ fun SearchScreen(container: AppContainer, onBack: (() -> Unit)?, onOpenWork: (Lo
     }
 
     if (showFilters) {
-        FilterSheet(state.query.copy(query = text), suggest = vm::suggest, onDismiss = { showFilters = false }) { q ->
+        FilterSheet(state.query.copy(query = text), suggest = vm::suggestFor, onDismiss = { showFilters = false }) { q ->
             showFilters = false
-            vm.search(q)
+            run(q)
+        }
+    }
+}
+
+/** What to do before searching: recent searches, your fandoms, and ready-made browses. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StartPage(
+    recent: List<SearchQuery>,
+    fandoms: List<String>,
+    language: String,
+    onSearch: (SearchQuery) -> Unit,
+    onClearRecent: () -> Unit,
+) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Text(stringResource(R.string.search_tips), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        }
+        if (recent.isNotEmpty()) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    StartTitle(stringResource(R.string.search_recent), Modifier.weight(1f))
+                    TextButton(onClick = onClearRecent) { Text(stringResource(R.string.search_clear_recent)) }
+                }
+                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    recent.forEach { q ->
+                        AssistChip(onClick = { onSearch(q) }, label = { Text(describe(q), maxLines = 1) },
+                            leadingIcon = { Icon(Icons.Filled.History, null, Modifier.size(18.dp)) })
+                    }
+                }
+            }
+        }
+        if (fandoms.isNotEmpty()) {
+            item {
+                StartTitle(stringResource(R.string.home_fandoms), Modifier.padding(start = 20.dp, top = 20.dp, bottom = 4.dp))
+                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    fandoms.forEach { f ->
+                        AssistChip(onClick = { onSearch(SearchQuery(fandoms = f, language = language, sort = SearchQuery.Sort.Updated)) },
+                            label = { Text(f, maxLines = 1) })
+                    }
+                }
+            }
+        }
+        item {
+            StartTitle(stringResource(R.string.search_browse), Modifier.padding(start = 20.dp, top = 20.dp, bottom = 4.dp))
+        }
+        val browses = listOf(
+            Triple(R.string.search_browse_latest, R.string.search_browse_latest_desc, SearchQuery(language = language, sort = SearchQuery.Sort.Updated)),
+            Triple(R.string.search_browse_kudos, R.string.search_browse_kudos_desc, SearchQuery(language = language, sort = SearchQuery.Sort.Kudos)),
+            Triple(R.string.search_browse_complete, R.string.search_browse_complete_desc,
+                SearchQuery(language = language, sort = SearchQuery.Sort.Kudos, completion = SearchQuery.Completion.Complete)),
+        )
+        items(browses) { (title, desc, q) ->
+            ListItem(
+                headlineContent = { Text(stringResource(title)) },
+                supportingContent = { Text(stringResource(desc)) },
+                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
+                modifier = Modifier.clickable { onSearch(q) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
         }
     }
 }
 
 @Composable
-private fun ActiveFilters(q: SearchQuery, total: String?, onClick: () -> Unit) {
-    val parts = buildList {
-        add(languageLabel(q.language))
-        add(stringResource(sortLabel(q.sort)))
-        if (q.ratings.isNotEmpty()) add(q.ratings.joinToString("/") { ratingShort(it) })
-        if (q.completion == SearchQuery.Completion.Complete) add(stringResource(R.string.filter_complete))
-        if (q.completion == SearchQuery.Completion.InProgress) add(stringResource(R.string.filter_in_progress))
-        if (q.fandoms.isNotBlank()) add(q.fandoms)
-        if (q.excludedTags.isNotBlank()) add("−" + q.excludedTags)
-    }
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-            parts.joinToString(" · "), style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 2.dp),
+private fun StartTitle(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = modifier)
+}
+
+/** Live suggestions while typing: search the keyword, or jump straight to a fandom / CP / character. */
+@Composable
+internal fun SuggestionList(term: String, s: Suggestions, onKeyword: (String) -> Unit, onTag: (String, String) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.search_keyword, term)) },
+                supportingContent = { Text(stringResource(R.string.search_keyword_desc)) },
+                leadingContent = { Icon(Icons.Filled.Search, null) },
+                modifier = Modifier.clickable { onKeyword(term) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+        }
+        val groups = listOf(
+            Triple("fandom", R.string.search_group_fandom, s.fandoms),
+            Triple("relationship", R.string.search_group_relationship, s.relationships),
+            Triple("character", R.string.search_group_character, s.characters),
+            Triple("freeform", R.string.search_group_freeform, s.freeforms),
         )
-        if (total != null) Text(total, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        groups.forEach { (type, label, tags) ->
+            if (tags.isNotEmpty()) {
+                item {
+                    Text(stringResource(label), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp))
+                }
+                items(tags) { tag ->
+                    ListItem(
+                        headlineContent = { Text(tag, maxLines = 2) },
+                        modifier = Modifier.clickable { onTag(type, tag) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                }
+            }
+        }
+        if (s.loading) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.search_finding_tags), color = MaterialTheme.colorScheme.outline)
+                }
+            }
+        } else if (s.error != null) {
+            item {
+                Text(stringResource(R.string.search_tags_failed, errorMessage(s.error)), color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(20.dp))
+            }
+        } else if (s.isEmpty && s.term.length >= 2) {
+            item {
+                Text(stringResource(R.string.search_no_tags), color = MaterialTheme.colorScheme.outline,
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(20.dp))
+            }
+        }
+    }
+}
+
+/** Short human label for a saved search. */
+@Composable
+private fun describe(q: SearchQuery): String = listOf(q.query, q.fandoms, q.relationships, q.characters, q.freeforms, q.title, q.creators)
+    .filter { it.isNotBlank() }.joinToString(" · ").ifEmpty { stringResource(sortLabel(q.sort)) }
+
+/** The active search as removable chips, plus quick sort and a door to all filters. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ActiveFilters(q: SearchQuery, total: String?, onChange: (SearchQuery) -> Unit, onMore: () -> Unit) {
+    var sortMenu by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            @Composable fun removable(label: String, clear: SearchQuery.() -> SearchQuery) {
+                InputChip(selected = true, onClick = { onChange(q.clear()) }, label = { Text(label, maxLines = 1) },
+                    trailingIcon = { Icon(Icons.Filled.Close, stringResource(R.string.search_remove_filter), Modifier.size(16.dp)) })
+            }
+            if (q.query.isNotBlank()) removable("「${q.query}」") { copy(query = "") }
+            if (q.fandoms.isNotBlank()) removable(q.fandoms) { copy(fandoms = "") }
+            if (q.relationships.isNotBlank()) removable(q.relationships) { copy(relationships = "") }
+            if (q.characters.isNotBlank()) removable(q.characters) { copy(characters = "") }
+            if (q.freeforms.isNotBlank()) removable(q.freeforms) { copy(freeforms = "") }
+            if (q.title.isNotBlank()) removable(q.title) { copy(title = "") }
+            if (q.creators.isNotBlank()) removable(q.creators) { copy(creators = "") }
+            if (q.excludedTags.isNotBlank()) removable("−" + q.excludedTags) { copy(excludedTags = "") }
+            if (q.completion != SearchQuery.Completion.Any) removable(stringResource(
+                if (q.completion == SearchQuery.Completion.Complete) R.string.filter_complete else R.string.filter_in_progress)) {
+                copy(completion = SearchQuery.Completion.Any)
+            }
+            if (q.ratings.isNotEmpty()) removable(q.ratings.joinToString("/") { ratingShort(it) }) { copy(ratings = emptySet()) }
+            Box {
+                FilterChip(selected = false, onClick = { sortMenu = true },
+                    label = { Text(stringResource(sortLabel(q.sort))) },
+                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null, Modifier.size(18.dp)) })
+                DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                    listOf(SearchQuery.Sort.BestMatch, SearchQuery.Sort.Updated, SearchQuery.Sort.Kudos, SearchQuery.Sort.Hits,
+                        SearchQuery.Sort.Bookmarks, SearchQuery.Sort.Words, SearchQuery.Sort.Posted).forEach { s ->
+                        DropdownMenuItem(text = { Text(stringResource(sortLabel(s))) }, onClick = {
+                            sortMenu = false
+                            onChange(q.copy(sort = s))
+                        })
+                    }
+                }
+            }
+            FilterChip(selected = false, onClick = onMore, label = { Text(languageLabel(q.language)) })
+            FilterChip(selected = false, onClick = onMore, label = { Text(stringResource(R.string.search_more_filters)) },
+                leadingIcon = { Icon(Icons.Filled.Tune, null, Modifier.size(18.dp)) })
+        }
+        if (total != null) Text(total, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp))
     }
 }
 
