@@ -105,7 +105,8 @@ import kotlinx.coroutines.withContext
 import java.util.Date
 
 /** Reading position: chapter, display block within the chapter, and character offset in that block. */
-data class Position(val chapter: Int, val block: Int, val char: Int = 0)
+/** [atEnd] is true once the reader has reached the very end of the work (counts as 100%). */
+data class Position(val chapter: Int, val block: Int, val char: Int = 0, val atEnd: Boolean = false)
 
 @Composable
 fun ReaderScreen(container: AppContainer, workId: Long, onBack: () -> Unit, onOpenFonts: () -> Unit) {
@@ -127,7 +128,9 @@ fun ReaderScreen(container: AppContainer, workId: Long, onBack: () -> Unit, onOp
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = { vm.load() }) { Text(stringResource(R.string.retry)) }
             }
-            is ReaderState.Ready -> ReaderBody(container, vm, st, s, colors, onBack, onOpenFonts)
+            is ReaderState.Ready -> androidx.compose.material3.MaterialTheme(colorScheme = colors.materialScheme()) {
+                ReaderBody(container, vm, st, s, colors, onBack, onOpenFonts)
+            }
         }
     }
 }
@@ -264,6 +267,7 @@ fun chapterFormat(): (Int) -> String {
 }
 
 private fun fraction(chapters: List<DisplayChapter>, p: Position): Float {
+    if (p.atEnd) return 1f
     val total = chapters.sumOf { it.charCount }.coerceAtLeast(1)
     val before = chapters.take(p.chapter).sumOf { it.charCount }
     val inChapter = chapters.getOrNull(p.chapter)?.blocks?.take(p.block)?.sumOf { it.text.length } ?: 0
@@ -299,9 +303,10 @@ private fun ScrollReader(
         }
     }
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect { idx ->
+        snapshotFlow { listState.firstVisibleItemIndex to !listState.canScrollForward }.collect { (idx, bottom) ->
             val (ch, block) = items.getOrNull(idx) ?: return@collect
-            val p = Position(ch, block, 0)
+            // The list holds the whole work, so hitting the bottom means the work is finished.
+            val p = Position(ch, block, 0, atEnd = bottom && items.isNotEmpty())
             lastReported = p
             onPosition(p)
         }
@@ -414,7 +419,8 @@ private fun PagedReader(
                         idx >= pageList.size -> onPosition(Position(chapterIndex + 1, 0, 0))
                         else -> {
                             val first = pageList[idx].first
-                            onPosition(Position(chapterIndex, first.blockIndex, first.start))
+                            val last = chapterIndex == chapters.lastIndex && idx == pageList.lastIndex
+                            onPosition(Position(chapterIndex, first.blockIndex, first.start, atEnd = last))
                         }
                     }
                 }

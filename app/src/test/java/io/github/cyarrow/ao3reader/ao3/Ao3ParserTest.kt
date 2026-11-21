@@ -97,6 +97,18 @@ class Ao3ParserTest {
         assertEquals(listOf("Only."), w.chapters[0].body.map { it.text })
     }
 
+    @Test fun parsesTagSearch() {
+        val html = """<div id="main"><h3 class="heading">3 Found</h3><ol class="tag index group">
+            <li><span class="canonical">Fandom: <a class="tag" href="/tags/RIIZE%20(Band)">RIIZE (Band)</a> (1,234)</span></li>
+            <li><span>Relationship: <a class="tag" href="/tags/x">Shotaro/Sungchan (RIIZE)</a> (88)</span></li>
+            <li><span>Freeform: <a class="tag" href="/tags/y">中文</a> (5)</span></li>
+            </ol></div>"""
+        val hits = Ao3Parser.parseTagSearch(html)
+        assertEquals(listOf("fandom", "relationship", "freeform"), hits.map { it.type })
+        assertEquals("RIIZE (Band)", hits[0].name)
+        assertEquals(1234, hits[0].uses)
+    }
+
     @Test fun parsesAutocomplete() {
         assertEquals(listOf("ENHYPEN (Band)", "Harry Potter - J. K. Rowling"),
             Ao3Parser.parseAutocomplete("""[{"id":"ENHYPEN (Band)","name":"ENHYPEN (Band)"},{"id":"x","name":"Harry Potter - J. K. Rowling"}]"""))

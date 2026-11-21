@@ -36,9 +36,12 @@ data class Suggestions(
     val fandoms: List<String> = emptyList(),
     val relationships: List<String> = emptyList(),
     val characters: List<String> = emptyList(),
+    val freeforms: List<String> = emptyList(),
     val loading: Boolean = false,
+    /** Set when AO3 could not be reached, so the UI does not claim "no matching tags". */
+    val error: Throwable? = null,
 ) {
-    val isEmpty get() = fandoms.isEmpty() && relationships.isEmpty() && characters.isEmpty()
+    val isEmpty get() = fandoms.isEmpty() && relationships.isEmpty() && characters.isEmpty() && freeforms.isEmpty()
 }
 
 class SearchViewModel(private val container: AppContainer) : ViewModel() {
@@ -84,23 +87,57 @@ class SearchViewModel(private val container: AppContainer) : ViewModel() {
     fun clearRecent() = viewModelScope.launch { container.readerPrefs.clearRecentSearches() }
 
     /** Fetches fandom / relationship / character suggestions for [text], debounced. */
+    private val suggestionCache = HashMap<String, Suggestions>()
+
     fun suggest(text: String) {
         suggestJob?.cancel()
         val term = text.trim()
         if (term.length < 2) { _suggestions.value = Suggestions(term); return }
+        suggestionCache[term.lowercase()]?.let { _suggestions.value = it; return }
         _suggestions.value = Suggestions(term, loading = true)
         suggestJob = viewModelScope.launch {
-            delay(450)
+            delay(600)
+            // Only look up the other script when it actually differs (Chinese input).
             val variants = container.converter().variants(term).take(2)
-            suspend fun fetch(type: String) = variants.flatMap { v ->
-                runCatching { container.ao3.autocomplete(type, v) }.getOrDefault(emptyList())
-            }.distinct().take(4)
-            val fandoms = fetch("fandom")
-            _suggestions.value = Suggestions(term, fandoms = fandoms, loading = true)
-            val relationships = fetch("relationship")
-            _suggestions.value = _suggestions.value.copy(relationships = relationships)
-            val characters = fetch("character")
-            _suggestions.value = _suggestions.value.copy(characters = characters, loading = false)
+            var failure: Throwable? = null
+            suspend fun fetch(type: String): List<String> = variants.flatMap { v ->
+                try {
+                    container.ao3.autocomplete(type, v)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    failure = e; emptyList()
+                }
+            }.distinct().take(5)
+
+            var current = Suggestions(term, loading = true)
+            current = current.copy(fandoms = fetch("fandom")); _suggestions.value = current
+            current = current.copy(relationships = fetch("relationship")); _suggestions.value = current
+            current = current.copy(characters = fetch("character")); _suggestions.value = current
+
+            // Autocomplete only matches word starts of canonical tags; AO3's tag search also finds
+            // substrings, synonyms and Chinese tag names.
+            if (current.isEmpty) {
+                for (v in variants) {
+                    try {
+                        val hits = container.ao3.searchTags(v)
+                        fun of(type: String) = hits.filter { it.type == type }.map { it.name }
+                        current = current.copy(
+                            fandoms = (current.fandoms + of("fandom")).distinct().take(5),
+                            relationships = (current.relationships + of("relationship")).distinct().take(5),
+                            characters = (current.characters + of("character")).distinct().take(5),
+                            freeforms = (current.freeforms + of("freeform")).distinct().take(5),
+                        )
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        failure = e
+                    }
+                }
+            }
+            current = current.copy(loading = false, error = if (current.isEmpty) failure else null)
+            _suggestions.value = current
+            if (current.error == null) suggestionCache[term.lowercase()] = current
         }
     }
 

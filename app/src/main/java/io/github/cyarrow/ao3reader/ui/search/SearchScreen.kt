@@ -162,6 +162,7 @@ fun SearchScreen(container: AppContainer, onBack: (() -> Unit)?, onOpenWork: (Lo
                         run(when (type) {
                             "fandom" -> base.copy(fandoms = tag, sort = SearchQuery.Sort.Updated)
                             "relationship" -> base.copy(relationships = tag)
+                            "freeform" -> base.copy(freeforms = tag)
                             else -> base.copy(characters = tag)
                         })
                     })
@@ -292,6 +293,7 @@ internal fun SuggestionList(term: String, s: Suggestions, onKeyword: (String) ->
             Triple("fandom", R.string.search_group_fandom, s.fandoms),
             Triple("relationship", R.string.search_group_relationship, s.relationships),
             Triple("character", R.string.search_group_character, s.characters),
+            Triple("freeform", R.string.search_group_freeform, s.freeforms),
         )
         groups.forEach { (type, label, tags) ->
             if (tags.isNotEmpty()) {
@@ -315,6 +317,11 @@ internal fun SuggestionList(term: String, s: Suggestions, onKeyword: (String) ->
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(R.string.search_finding_tags), color = MaterialTheme.colorScheme.outline)
                 }
+            }
+        } else if (s.error != null) {
+            item {
+                Text(stringResource(R.string.search_tags_failed, errorMessage(s.error)), color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(20.dp))
             }
         } else if (s.isEmpty && s.term.length >= 2) {
             item {

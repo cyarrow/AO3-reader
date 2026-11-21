@@ -210,4 +210,8 @@
     <string name="search_no_tags">No matching tags. You can still search the keyword.</string>
     <string name="search_remove_filter">Remove</string>
     <string name="search_more_filters">More filters</string>
+    <string name="progress_finished">Finished</string>
+    <string name="work_read_again">Read again</string>
+    <string name="search_group_freeform">Tags</string>
+    <string name="search_tags_failed">Couldn\'t load tag suggestions: %1$s</string>
 </resources>

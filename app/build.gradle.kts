@@ -108,4 +108,5 @@ tasks.withType<Test>().configureEach {
     systemProperty("screenshots", record.toString())
     systemProperty("robolectric.pixelCopyRenderMode", "hardware")
     maxHeapSize = "3g"
+    (findProperty("live") as String?)?.let { systemProperty("live", it) }
 }

@@ -48,7 +48,26 @@ class Ao3Client(private val client: OkHttpClient) {
     suspend fun autocomplete(type: String, term: String): List<String> {
         if (term.isBlank()) return emptyList()
         val url = "$BASE/autocomplete/$type".toHttpUrl().newBuilder().addQueryParameter("term", term.trim()).build()
-        return Ao3Parser.parseAutocomplete(get(url))
+        return Ao3Parser.parseAutocomplete(getWithRetry(url))
+    }
+
+    /** AO3's tag search: substring and Chinese matches the autocomplete can miss, most-used first. */
+    suspend fun searchTags(term: String): List<Ao3Parser.TagHit> {
+        val url = "$BASE/tags/search".toHttpUrl().newBuilder()
+            .addQueryParameter("tag_search[name]", term.trim())
+            .addQueryParameter("tag_search[sort_column]", "uses")
+            .addQueryParameter("tag_search[sort_direction]", "desc")
+            .addQueryParameter("commit", "Search Tags")
+            .build()
+        return Ao3Parser.parseTagSearch(getWithRetry(url))
+    }
+
+    /** Light requests retry once when AO3 asks us to slow down. */
+    private suspend fun getWithRetry(url: HttpUrl): String = try {
+        get(url)
+    } catch (e: Ao3Exception.RateLimited) {
+        delay(((e.retryAfterSeconds ?: 2L).coerceIn(1L, 5L)) * 1000)
+        get(url)
     }
 
     /** Result of a raw request: final URL after redirects and the body. */

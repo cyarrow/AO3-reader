@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -82,6 +83,21 @@ class ScreenshotTest {
         compose.onNodeWithText("顯示").performClick()
         settle()
         captureScreenRoboImage(File(out, "reader_settings.png").path)
+    }
+
+    /** Phone in dark mode, reader on the paper theme: controls must follow the reader theme. */
+    @Test @Config(qualifiers = "+night") fun readerSettingsDarkSystem() {
+        settings { it.copy(mode = ReadingMode.Scroll, theme = ReaderTheme.Paper) }
+        compose.setContent { AO3ReaderTheme { ReaderScreen(app.container, 1L, onBack = {}, onOpenFonts = {}) } }
+        settle()
+        compose.onRoot().performTouchInput { click(center) }
+        settle()
+        compose.onNodeWithText("顯示").performClick()
+        settle()
+        compose.onNode(androidx.compose.ui.test.hasScrollAction() and androidx.compose.ui.test.hasAnyChild(androidx.compose.ui.test.hasText("亮度")))
+            .performTouchInput { swipeUp() }
+        settle()
+        captureScreenRoboImage(File(out, "reader_settings_dark_system.png").path)
     }
 
     @Test fun readerChrome() {
